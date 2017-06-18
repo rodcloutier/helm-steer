@@ -89,18 +89,9 @@ func (c *ChartSpec) buildHelmCmdArgs(skippedFields []string) []string {
 	return cmd
 }
 
-func (c *ChartSpec) install() error {
+func runHelmCmd(name string, args []string) error {
 
-	skippedFlags := []string{
-		"chart",
-		"recreate-pods",
-		"reset-values",
-		"reuse-values",
-	}
-
-	args := c.buildHelmCmdArgs(skippedFlags)
-	args = append([]string{"install"}, args...)
-	args = append(args, c.Chart)
+	args = append([]string{name}, args...)
 
 	fmt.Printf("helm %s\n", strings.Trim(fmt.Sprint(args), "[]"))
 
@@ -113,4 +104,32 @@ func (c *ChartSpec) install() error {
 	}
 	err = cmd.Wait()
 	return err
+}
+
+func (c *ChartSpec) install() error {
+	skippedFlags := []string{
+		"chart",
+		"recreate-pods",
+		"reset-values",
+		"reuse-values",
+	}
+
+	args := c.buildHelmCmdArgs(skippedFlags)
+	args = append(args, c.Chart)
+
+	return runHelmCmd("install", args)
+}
+
+func (c *ChartSpec) update() error {
+	skippedFlags := []string{
+		"chart",
+		"name",
+		"name-template",
+		"replace",
+	}
+
+	args := c.buildHelmCmdArgs(skippedFlags)
+	args = append(args, c.Name, c.Chart)
+
+	return runHelmCmd("update", args)
 }

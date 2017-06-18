@@ -40,7 +40,11 @@ func Steer(planPath string) error {
 	// if not present
 	//      install
 	for _, c := range plan.Charts {
-		c.install()
+		err = c.install()
+		if err != nil {
+			fmt.Printf("Error: Chart %s (%s) failed to install\n", c.Name, c.Chart)
+			return err
+		}
 	}
 	// else
 	//      upgrade
