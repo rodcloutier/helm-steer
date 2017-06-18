@@ -1,0 +1,10 @@
+hash: 0fc0ac86f39e917b102e450f864e16ca6e6799c429bca54f4d5ea57d8c779e06
+updated: 2017-06-18T00:04:26.597954344-04:00
+imports:
+- name: github.com/ghodss/yaml
+  version: 73d445a93680fa1a78ae23a5839bad48f32ba1ee
+- name: github.com/urfave/cli
+  version: cf33a9befefdd6c6ea1a236ab6d546e797a62cbf
+- name: gopkg.in/yaml.v2
+  version: 53feefa2559fb8dfa8d81baad31be332c97d6c77
+testImports: []
