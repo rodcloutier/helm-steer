@@ -56,3 +56,4 @@ charts:
     reset-values: false
     # when upgrading, reuse the last release's values, and merge in any
     reuse-values: false
+
