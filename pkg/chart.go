@@ -1,12 +1,10 @@
 package steer
 
 import (
-	"fmt"
-	"os"
-	"os/exec"
 	"reflect"
 	"sort"
-	"strings"
+
+	"github.com/rodcloutier/helm-steer/pkg/helm"
 )
 
 type ChartSpec struct {
@@ -89,26 +87,6 @@ func (c *ChartSpec) buildHelmCmdArgs(skippedFields []string) []string {
 	return cmd
 }
 
-func runHelmCmd(name string, args []string) error {
-
-	args = append([]string{name}, args...)
-
-	fmt.Printf("helm %s\n", strings.Trim(fmt.Sprint(args), "[]"))
-	if dryRun {
-		return nil
-	}
-
-	cmd := exec.Command("helm", args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	err := cmd.Start()
-	if err != nil {
-		return err
-	}
-	err = cmd.Wait()
-	return err
-}
-
 func (c *ChartSpec) install() error {
 	skippedFlags := []string{
 		"chart",
@@ -120,7 +98,7 @@ func (c *ChartSpec) install() error {
 	args := c.buildHelmCmdArgs(skippedFlags)
 	args = append(args, c.Chart)
 
-	return runHelmCmd("install", args)
+	return helm.Run("install", args, dryRun)
 }
 
 func (c *ChartSpec) update() error {
@@ -134,5 +112,5 @@ func (c *ChartSpec) update() error {
 	args := c.buildHelmCmdArgs(skippedFlags)
 	args = append(args, c.Name, c.Chart)
 
-	return runHelmCmd("update", args)
+	return helm.Run("update", args, dryRun)
 }

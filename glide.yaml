@@ -1,3 +1,8 @@
 package: github.com/rodcloutier/helm-steer
 import:
 - package: github.com/urfave/cli
+- package: github.com/ghodss/yaml
+- package: github.com/Masterminds/semver
+- package: k8s.io/helm
+- package: github.com/deckarep/golang-set
+

@@ -5,5 +5,6 @@ version: "2.4.1+0"
 usage: "operates multiple charts in a cluster"
 description: "Help operate multiple charts in a cluster."
 command: "$HELM_PLUGIN_DIR/steer"
+useTunnel: true
 hooks:
   install: "$HELM_PLUGIN_DIR/install-binary.sh"

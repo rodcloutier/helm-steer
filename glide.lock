@@ -1,10 +1,72 @@
 hash: 0fc0ac86f39e917b102e450f864e16ca6e6799c429bca54f4d5ea57d8c779e06
-updated: 2017-06-18T00:04:26.597954344-04:00
+updated: 2017-06-18T22:27:29.876572941-04:00
 imports:
+- name: github.com/BurntSushi/toml
+  version: b26d9c308763d68093482582cea63d69be07a0f0
+- name: github.com/deckarep/golang-set
+  version: a4b9a94ae3157ef89441395f98c6ab4018fcb26a
+- name: github.com/facebookgo/symwalk
+  version: 42004b9f322246749dd73ad71008b1f3160c0052
 - name: github.com/ghodss/yaml
   version: 73d445a93680fa1a78ae23a5839bad48f32ba1ee
+- name: github.com/gobwas/glob
+  version: bea32b9cd2d6f55753d94a28e959b13f0244797a
+  subpackages:
+  - compiler
+  - match
+  - syntax
+  - syntax/ast
+  - syntax/lexer
+  - util/runes
+  - util/strings
+- name: github.com/golang/protobuf
+  version: 2bba0603135d7d7f5cb73b2125beeda19c09f4ef
+  subpackages:
+  - proto
+  - ptypes/any
+  - ptypes/timestamp
+- name: github.com/Masterminds/semver
+  version: 3f0ab6d4ab4bed1c61caf056b63a6e62190c7801
 - name: github.com/urfave/cli
   version: cf33a9befefdd6c6ea1a236ab6d546e797a62cbf
+- name: golang.org/x/net
+  version: e90d6d0afc4c315a0d87a568ae68577cc15149a0
+  subpackages:
+  - context
+  - http2
+  - http2/hpack
+  - internal/timeseries
+  - lex/httplex
+  - trace
+- name: google.golang.org/grpc
+  version: 8050b9cbc271307e5a716a9d782803d09b0d6f2d
+  subpackages:
+  - codes
+  - credentials
+  - grpclog
+  - internal
+  - keepalive
+  - metadata
+  - naming
+  - peer
+  - stats
+  - tap
+  - transport
 - name: gopkg.in/yaml.v2
   version: 53feefa2559fb8dfa8d81baad31be332c97d6c77
+- name: k8s.io/apimachinery
+  version: c368bcd6cfe40f43139ce5b85365cd998fe99084
+  subpackages:
+  - pkg/version
+- name: k8s.io/helm
+  version: 82d8e9498d96535cc6787a6a9194a76161d29b4c
+  subpackages:
+  - pkg/chartutil
+  - pkg/helm
+  - pkg/ignore
+  - pkg/proto/hapi/chart
+  - pkg/proto/hapi/release
+  - pkg/proto/hapi/services
+  - pkg/proto/hapi/version
+  - pkg/version
 testImports: []
