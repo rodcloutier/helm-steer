@@ -34,6 +34,12 @@ func (p *Plan) process() error {
 	deployedReleasesMap := make(map[string]*release.Release)
 
 	for _, r := range releases {
+
+		// Check if the plan targets the namespace
+		_, ok := p.Namespaces[r.Namespace]
+		if !ok {
+			continue
+		}
 		key := r.Namespace + "." + r.Name
 		deployedReleases.Add(key)
 		deployedReleasesMap[key] = r
