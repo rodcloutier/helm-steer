@@ -19,7 +19,11 @@ type Plan struct {
 	Namespaces map[string]Namespace `json:"namespaces"`
 }
 
-func Steer(planPath string) error {
+var dryRun bool
+
+func Steer(planPath string, dr bool) error {
+
+	dryRun = dr
 
 	// TODO make sure helm is in the path
 	// TODO make sure helm is initialized
@@ -39,7 +43,7 @@ func Steer(planPath string) error {
 
 	for name, namespace := range plan.Namespaces {
 
-		fmt.Printf("Processing namespace \"%s\n\"", name)
+		fmt.Printf("Processing namespace \"%s\"\n", name)
 
 		for stackName, stack := range namespace {
 

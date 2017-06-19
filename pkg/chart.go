@@ -94,6 +94,9 @@ func runHelmCmd(name string, args []string) error {
 	args = append([]string{name}, args...)
 
 	fmt.Printf("helm %s\n", strings.Trim(fmt.Sprint(args), "[]"))
+	if dryRun {
+		return nil
+	}
 
 	cmd := exec.Command("helm", args...)
 	cmd.Stdout = os.Stdout
