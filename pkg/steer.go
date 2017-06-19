@@ -7,15 +7,16 @@ import (
 	"github.com/ghodss/yaml"
 )
 
-type Plan struct {
-	Charts []ChartSpec `json:"charts"`
+type Stack struct {
+	Spec    ChartSpec `json:"spec"`
+	Depends []string  `json:"depends"`
 }
 
-var skippedInstallFlags = []string{
-	"chart",
-	"name",
-	"name-template",
-	"replace",
+type Namespace map[string]Stack
+
+type Plan struct {
+	Version    string               `json:version`
+	Namespaces map[string]Namespace `json:"namespaces"`
 }
 
 func Steer(planPath string) error {
@@ -36,18 +37,37 @@ func Steer(planPath string) error {
 		return err
 	}
 
-	// For each chart, run the install command
-	// if not present
-	//      install
-	for _, c := range plan.Charts {
-		err = c.install()
-		if err != nil {
-			fmt.Printf("Error: Chart %s (%s) failed to install\n", c.Name, c.Chart)
-			return err
+	for name, namespace := range plan.Namespaces {
+
+		fmt.Printf("Processing namespace \"%s\n\"", name)
+
+		for stackName, stack := range namespace {
+
+			// Validate spec
+			if stack.Spec.Name != stackName {
+				if stack.Spec.Name != "" {
+					fmt.Println("Warning: Mismatch between stack name (%s) and stack flag --name (%s). Using %s\n", stackName, stack.Spec.Name, stackName)
+				}
+				stack.Spec.Name = stackName
+			}
+
+			if stack.Spec.Namespace != name {
+				if stack.Spec.Namespace != "" {
+					fmt.Println("Warning: Mismatch between namespace name (%s) and stack flag --namespace (%s). Using %s\n", name, stack.Spec.Namespace, name)
+				}
+				stack.Spec.Namespace = name
+			}
+			// For each chart spec, run the install command
+			// if not present
+			//      install
+			err = stack.Spec.install()
+			if err != nil {
+				fmt.Printf("Error: Stack %s (%s) failed to install\n", stackName, stack.Spec)
+				return err
+			}
+			// else
+			//      upgrade
 		}
 	}
-	// else
-	//      upgrade
-
 	return nil
 }
