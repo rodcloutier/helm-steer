@@ -2,26 +2,28 @@ package steer
 
 import (
 	"fmt"
+	"io/ioutil"
 
 	"github.com/Masterminds/semver"
 	"github.com/deckarep/golang-set"
+	"github.com/ghodss/yaml"
 	"github.com/rodcloutier/helm-steer/pkg/helm"
 	"k8s.io/helm/pkg/proto/hapi/release"
 )
 
 type Stack struct {
-	Spec    ChartSpec `json:"spec"`
-	Depends []string  `json:"depends"`
+	Spec ChartSpec `json:"spec"`
+	Deps []string  `json:"depends"`
 }
 
 type Namespace map[string]Stack
 
 type Plan struct {
-	Version    string               `json:version`
 	Namespaces map[string]Namespace `json:"namespaces"`
+	Version    string               `json:"version"`
 }
 
-func (p *Plan) process(namespaces []string) ([]Command, error) {
+func (p *Plan) process(namespaces []string) ([]*Command, error) {
 
 	// TODO do this per namespace ?
 	var isValidNamespace func(string) bool
@@ -54,12 +56,12 @@ func (p *Plan) process(namespaces []string) ([]Command, error) {
 	specifiedReleases := mapset.NewSet()
 	stackMap := make(map[string]Stack)
 
-	for name, ns := range p.Namespaces {
-		if !isValidNamespace(name) {
+	for namespaceName, ns := range p.Namespaces {
+		if !isValidNamespace(namespaceName) {
 			continue
 		}
 		for stackName, _ := range ns {
-			key := name + "." + stackName
+			key := namespaceName + "." + stackName
 			specifiedReleases.Add(key)
 			stackMap[key] = ns[stackName]
 		}
@@ -92,10 +94,9 @@ func (p *Plan) process(namespaces []string) ([]Command, error) {
 		return nil, err
 	}
 
-	createCommands := func(s mapset.Set, f CommandFactory) []Command {
-		cmds := []Command{}
-		it := s.Iterator()
-		for r := range it.C {
+	createCommands := func(s mapset.Set, f CommandFactory) []*Command {
+		cmds := []*Command{}
+		for r := range s.Iter() {
 			release := r.(string)
 			cmds = append(cmds, f(stackMap[release]))
 		}
@@ -106,15 +107,17 @@ func (p *Plan) process(namespaces []string) ([]Command, error) {
 	cmds = append(cmds, createCommands(install, NewInstallCommand)...)
 	cmds = append(cmds, createCommands(upgrade, NewUpgradeCommand)...)
 
-	return cmds, nil
+	fmt.Println("Resolving dependencies")
+	cmds, err = ResolveDependencies(cmds)
+
+	return cmds, err
 }
 
 func extractUpgrades(known mapset.Set, releasesMap map[string]*release.Release, stackMap map[string]Stack) (mapset.Set, error) {
 
 	upgrade := mapset.NewSet()
 
-	it := known.Iterator()
-	for r := range it.C {
+	for r := range known.Iter() {
 
 		// TODO check for semver parsable version
 
@@ -142,4 +145,41 @@ func extractUpgrades(known mapset.Set, releasesMap map[string]*release.Release, 
 		upgrade.Add(release)
 	}
 	return upgrade, nil
+}
+
+// Conform will apply the name and namespaces to the contained Stack
+func (p *Plan) Conform() {
+	for namespaceName, ns := range p.Namespaces {
+		for stackName, _ := range ns {
+			stack := ns[stackName]
+			stack.Conform(namespaceName, stackName)
+			ns[stackName] = stack
+		}
+	}
+}
+
+func (s *Stack) Conform(namespaceName, stackName string) {
+	// TODO should we validate that the names correspond to the expected value?
+	s.Spec.Name = stackName
+	s.Spec.Namespace = namespaceName
+}
+
+// Load will load a plan file and return the plan
+func Load(planPath string) (*Plan, error) {
+	// Read the plan.yaml file specified
+	content, err := ioutil.ReadFile(planPath)
+	if err != nil {
+		return nil, err
+	}
+
+	var plan Plan
+	err = yaml.Unmarshal(content, &plan)
+	if err != nil {
+		fmt.Println("err:%v\n", err)
+		return nil, err
+	}
+
+	plan.Conform()
+
+	return &plan, nil
 }
