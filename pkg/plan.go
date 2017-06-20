@@ -1,6 +1,8 @@
 package steer
 
 import (
+	"fmt"
+
 	"github.com/Masterminds/semver"
 	"github.com/deckarep/golang-set"
 	"github.com/rodcloutier/helm-steer/pkg/helm"
@@ -19,10 +21,25 @@ type Plan struct {
 	Namespaces map[string]Namespace `json:"namespaces"`
 }
 
-func (p *Plan) process() ([]Command, error) {
+func (p *Plan) process(namespaces []string) ([]Command, error) {
 
-	// TODO do this per namespace
-	// TODO allow to target only a specific namespace
+	// TODO do this per namespace ?
+	var isValidNamespace func(string) bool
+
+	if len(namespaces) == 0 {
+		isValidNamespace = func(string) bool {
+			return true
+		}
+	} else {
+		namespacesMap := map[string]bool{}
+		for _, ns := range namespaces {
+			namespacesMap[ns] = true
+		}
+		isValidNamespace = func(ns string) bool {
+			_, ok := namespacesMap[ns]
+			return ok
+		}
+	}
 
 	// List the currently installed chart deployments
 	// helm list
@@ -34,9 +51,29 @@ func (p *Plan) process() ([]Command, error) {
 	releases := mapset.NewSet()
 	releasesMap := make(map[string]*release.Release)
 
-	for _, r := range currentReleases {
+	specifiedReleases := mapset.NewSet()
+	stackMap := make(map[string]Stack)
 
-		// Check if the plan targets the namespace
+	for name, ns := range p.Namespaces {
+		if !isValidNamespace(name) {
+			continue
+		}
+		for stackName, _ := range ns {
+			key := name + "." + stackName
+			specifiedReleases.Add(key)
+			stackMap[key] = ns[stackName]
+		}
+	}
+
+	if specifiedReleases.Cardinality() == 0 {
+		fmt.Println("Nothing to do, no stack found")
+		return nil, nil
+	}
+
+	for _, r := range currentReleases {
+		if !isValidNamespace(r.Namespace) {
+			continue
+		}
 		_, ok := p.Namespaces[r.Namespace]
 		if !ok {
 			continue
@@ -44,17 +81,6 @@ func (p *Plan) process() ([]Command, error) {
 		key := r.Namespace + "." + r.Name
 		releases.Add(key)
 		releasesMap[key] = r
-	}
-
-	specifiedReleases := mapset.NewSet()
-	stackMap := make(map[string]Stack)
-
-	for name, namespace := range p.Namespaces {
-		for stackName, _ := range namespace {
-			key := name + "." + stackName
-			specifiedReleases.Add(key)
-			stackMap[key] = namespace[stackName]
-		}
 	}
 
 	install := specifiedReleases.Difference(releases)

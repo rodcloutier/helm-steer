@@ -5,6 +5,10 @@ VERSION := $(shell sed -n -e 's/version:[ "]*\([^"]*\).*/\1/p' plugin.yaml)
 DIST := $(CURDIR)/_dist
 LDFLAGS := "-X main.version=${VERSION}"
 
+ifeq ($(OS),Windows_NT)
+	EXT := .exe
+endif
+
 .PHONY: install
 install: bootstrap build
 	cp steer $(HELM_PLUGIN_DIR)
@@ -13,12 +17,16 @@ install: bootstrap build
 .PHONY: hookInstall
 hookInstall: bootstrap build
 
+.PHONY: generate
+generate:
+	go generate ./pkg/commands/.
+
 .PHONY: build
-build:
-	go build -o steer -ldflags $(LDFLAGS) ./main.go
+build: #generate
+	go build -o steer$(EXT) -ldflags $(LDFLAGS) ./main.go
 
 .PHONY: dist
-dist:
+dist: generate
 	mkdir -p $(DIST)
 	GOOS=linux GOARCH=amd64 go build -o steer -ldflags $(LDFLAGS) ./main.go
 	tar -zcvf $(DIST)/helm-template-linux-$(VERSION).tgz steer README.md LICENSE.txt plugin.yaml

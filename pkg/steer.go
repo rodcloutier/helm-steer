@@ -9,7 +9,7 @@ import (
 
 var dryRun bool
 
-func Steer(planPath string, dr bool) error {
+func Steer(planPath string, namespaces []string, dr bool) error {
 
 	dryRun = dr
 
@@ -26,7 +26,7 @@ func Steer(planPath string, dr bool) error {
 		return err
 	}
 
-	cmds, err := plan.process()
+	cmds, err := plan.process(namespaces)
 	if err != nil {
 		return err
 	}

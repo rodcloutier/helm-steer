@@ -11,6 +11,7 @@ import (
 func main() {
 
 	var dryRun bool
+	namespaces := cli.StringSlice{}
 
 	app := cli.NewApp()
 	app.Name = "helm-steer"
@@ -20,7 +21,7 @@ func main() {
 			return cli.NewExitError("missing expected plan file", 1)
 		}
 		plan := c.Args()[0]
-		return steer.Steer(plan, dryRun)
+		return steer.Steer(plan, namespaces, dryRun)
 	}
 
 	app.Flags = []cli.Flag{
@@ -28,6 +29,11 @@ func main() {
 			Name:        "dry-run",
 			Usage:       "only print the operations but does not perform them",
 			Destination: &dryRun,
+		},
+		cli.StringSliceFlag{
+			Name:  "namespace",
+			Usage: "specify the namespace to target",
+			Value: &namespaces,
 		},
 	}
 
