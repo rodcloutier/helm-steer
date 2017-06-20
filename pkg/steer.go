@@ -13,9 +13,6 @@ func Steer(planPath string, dr bool) error {
 
 	dryRun = dr
 
-	// TODO make sure helm is in the path
-	// TODO make sure helm is initialized
-
 	// Read the plan.yaml file specified
 	content, err := ioutil.ReadFile(planPath)
 	if err != nil {
@@ -29,5 +26,19 @@ func Steer(planPath string, dr bool) error {
 		return err
 	}
 
-	return plan.run()
+	cmds, err := plan.process()
+	if err != nil {
+		return err
+	}
+
+	for _, cmd := range cmds {
+
+		err = cmd.Run()
+		if err != nil {
+			fmt.Println("Error: Last command failed. Undoing previous commands")
+			UndoCommands()
+			return err
+		}
+	}
+	return nil
 }

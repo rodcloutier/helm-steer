@@ -101,7 +101,7 @@ func (c *ChartSpec) install() error {
 	return helm.Run("install", args, dryRun)
 }
 
-func (c *ChartSpec) update() error {
+func (c *ChartSpec) upgrade() error {
 	skippedFlags := []string{
 		"chart",
 		"name",
@@ -112,5 +112,5 @@ func (c *ChartSpec) update() error {
 	args := c.buildHelmCmdArgs(skippedFlags)
 	args = append(args, c.Name, c.Chart)
 
-	return helm.Run("update", args, dryRun)
+	return helm.Run("upgrade", args, dryRun)
 }
