@@ -25,9 +25,14 @@ import (
 	"github.com/rodcloutier/helm-steer/pkg"
 )
 
-var cfgFile string
-var namespaces []string
-var dryRun bool
+var (
+	// The config file to use for persistent settings
+	cfgFile string
+	// The namespaces targeted (empty is all namespaces)
+	namespaces []string
+	// Do not perform the actual options
+	dryRun bool
+)
 
 // RootCmd represents the base command when called without any subcommands
 var RootCmd = &cobra.Command{

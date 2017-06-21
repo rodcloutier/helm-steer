@@ -2,6 +2,7 @@ package helm
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strings"
@@ -69,8 +70,6 @@ func List() ([]*release.Release, error) {
 		// Maybe do this only if r.Config.Values is empty
 		var config map[string]interface{}
 		err = yaml.Unmarshal([]byte(r.Config.Raw), &config)
-
-		// fmt.Println(config)
 	}
 
 	return res.Releases, nil
