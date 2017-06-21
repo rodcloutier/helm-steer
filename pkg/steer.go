@@ -2,14 +2,13 @@ package steer
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/rodcloutier/helm-steer/pkg/executor"
 	"github.com/rodcloutier/helm-steer/pkg/plan"
 )
 
-func Steer(planPath string, namespaces []string, dr bool) error {
-
-	executor.DryRun = dr
+func Steer(outputWriter, debugWriter io.Writer, planPath string, namespaces []string, dryRun bool) error {
 
 	pl, err := plan.Load(planPath)
 	if err != nil {
@@ -25,11 +24,21 @@ func Steer(planPath string, namespaces []string, dr bool) error {
 	ranCommands := []executor.Command{}
 	for _, cmdArgs := range cmdArgs {
 		cmd := executor.NewExecutableCommand("helm", cmdArgs.Run)
-		err = cmd.Run()
+		fmt.Fprintf(debugWriter, "Executing `%s` ...\n", cmd)
+		if dryRun {
+			continue
+		}
+		err = cmd.Run(outputWriter)
 		if err != nil {
 			fmt.Println("Error: Last command failed. Undoing previous commands")
-			// executor.UndoCommands()
-			undoCommands(ranCommands)
+			// Undo the commands
+			for _, undoCmd := range ranCommands {
+				fmt.Fprintf(debugWriter, "Executing `%s` ...\n", undoCmd)
+				err := undoCmd.Run(outputWriter)
+				if err != nil {
+					fmt.Println("Failed to perform undo command %s", cmd)
+				}
+			}
 			return err
 		}
 		if len(cmdArgs.Undo) > 0 {
@@ -38,13 +47,4 @@ func Steer(planPath string, namespaces []string, dr bool) error {
 		}
 	}
 	return nil
-}
-
-func undoCommands(cmds []executor.Command) {
-	for _, cmd := range cmds {
-		err := cmd.Run()
-		if err != nil {
-			fmt.Println("Failed to perform undo command %s", cmd)
-		}
-	}
 }

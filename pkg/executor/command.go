@@ -2,24 +2,19 @@ package executor
 
 import (
 	"fmt"
-	"os"
+	"io"
 	"os/exec"
 	"strings"
 )
 
 type Command interface {
-	Run() error
+	String() string
+	Run(w io.Writer) error
 }
 
 type executableCommand struct {
 	entrypoint string
 	args       []string
-}
-
-var DryRun bool
-
-func init() {
-	DryRun = false
 }
 
 func NewExecutableCommand(e string, args []string) Command {
@@ -29,16 +24,16 @@ func NewExecutableCommand(e string, args []string) Command {
 	}
 }
 
-func (c executableCommand) Run() error {
+func (c executableCommand) String() string {
+	items := []string{c.entrypoint}
+	items = append(items, c.args...)
+	return fmt.Sprintf(strings.Join(items, " "))
+}
 
-	fmt.Printf("%s %s\n", c.entrypoint, strings.Trim(fmt.Sprint(c.args), "[]"))
-	if DryRun {
-		return nil
-	}
-
+func (c executableCommand) Run(w io.Writer) error {
 	cmd := exec.Command(c.entrypoint, c.args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	cmd.Stdout = w
+	cmd.Stderr = w
 	err := cmd.Start()
 	if err != nil {
 		return err

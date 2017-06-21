@@ -16,6 +16,8 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"os"
 
 	homedir "github.com/mitchellh/go-homedir"
@@ -32,6 +34,14 @@ var (
 	namespaces []string
 	// Do not perform the actual options
 	dryRun bool
+	// The debug flag
+	debug bool
+	// The verbose flag
+	verbose bool
+	// The debug writer
+	debugWriter io.Writer = ioutil.Discard
+	// The output writer
+	outputWriter io.Writer = ioutil.Discard
 )
 
 // RootCmd represents the base command when called without any subcommands
@@ -50,7 +60,19 @@ var RootCmd = &cobra.Command{
 			// warning, only the first one will be evaluated
 			fmt.Println("warning: Specifiying multiple plans is not currently supported. Only the first one will be processed")
 		}
-		return steer.Steer(args[0], namespaces, dryRun)
+
+		if debug {
+			debugWriter = cmd.OutOrStderr()
+		}
+		if verbose {
+			outputWriter = cmd.OutOrStderr()
+		}
+
+		cmd.SilenceUsage = true
+
+		// TODO move the command execution in a function here to use a closure on the
+		// writers?
+		return steer.Steer(outputWriter, debugWriter, args[0], namespaces, dryRun)
 	},
 }
 
@@ -66,6 +88,8 @@ func Execute() {
 func init() {
 	cobra.OnInitialize(initConfig)
 
+	RootCmd.PersistentFlags().BoolVarP(&debug, "debug", "d", false, "Print the executed commands to stderr")
+	RootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Print the executed commands output to stderr")
 	RootCmd.Flags().BoolVarP(&dryRun, "dry-run", "", false, "only print the operations but does not perform them")
 	RootCmd.Flags().StringSliceVarP(&namespaces, "namespace", "n", []string{}, "specify the namespace(s) to target")
 }
