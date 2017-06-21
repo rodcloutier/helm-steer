@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 
 	"github.com/Masterminds/semver"
+	"github.com/asaskevich/govalidator"
 	"github.com/deckarep/golang-set"
 	"github.com/ghodss/yaml"
 	"github.com/rodcloutier/helm-steer/pkg/helm"
@@ -12,15 +13,15 @@ import (
 )
 
 type Stack struct {
-	Spec ChartSpec `json:"spec"`
-	Deps []string  `json:"depends"`
+	Spec ChartSpec `valid:"required" json:"spec"`
+	Deps []string  `valid:"optional" json:"depends"`
 }
 
 type Namespace map[string]Stack
 
 type Plan struct {
-	Namespaces map[string]Namespace `json:"namespaces"`
-	Version    string               `json:"version"`
+	Namespaces map[string]Namespace `valid:"-" json:"namespaces"`
+	Version    *string              `valid:"semver,required" json:"version"`
 }
 
 func (p *Plan) process(namespaces []string) ([]*Command, error) {
@@ -147,21 +148,38 @@ func extractUpgrades(known mapset.Set, releasesMap map[string]*release.Release, 
 	return upgrade, nil
 }
 
+func (s *Stack) Conform(namespaceName, stackName string) {
+	// TODO should we validate that the names correspond to the expected value?
+	s.Spec.Name = stackName
+	s.Spec.Namespace = namespaceName
+}
+
 // Conform will apply the name and namespaces to the contained Stack
 func (p *Plan) Conform() {
 	for namespaceName, ns := range p.Namespaces {
-		for stackName, _ := range ns {
-			stack := ns[stackName]
+		for stackName, stack := range ns {
 			stack.Conform(namespaceName, stackName)
 			ns[stackName] = stack
 		}
 	}
 }
 
-func (s *Stack) Conform(namespaceName, stackName string) {
-	// TODO should we validate that the names correspond to the expected value?
-	s.Spec.Name = stackName
-	s.Spec.Namespace = namespaceName
+func (p *Plan) Validate() (bool, error) {
+
+	result, err := govalidator.ValidateStruct(p)
+	if err != nil {
+		return result, err
+	}
+
+	for _, ns := range p.Namespaces {
+		for name, stack := range ns {
+			result, err = govalidator.ValidateStruct(stack)
+			if err != nil {
+				return result, fmt.Errorf("'%s' stack field %s", name, err)
+			}
+		}
+	}
+	return result, err
 }
 
 // Load will load a plan file and return the plan
@@ -175,11 +193,19 @@ func Load(planPath string) (*Plan, error) {
 	var plan Plan
 	err = yaml.Unmarshal(content, &plan)
 	if err != nil {
-		fmt.Println("err:%v\n", err)
+		fmt.Println("Error: %v\n", err)
+		return nil, err
+	}
+
+	_, err = plan.Validate()
+	if err != nil {
+		fmt.Printf("Error: %s\n", err)
 		return nil, err
 	}
 
 	plan.Conform()
 
-	return &plan, nil
+	// _, err = plan.Validate()
+
+	return &plan, err
 }

@@ -2,7 +2,13 @@ package steer
 
 import (
 	"fmt"
+
+	"github.com/asaskevich/govalidator"
 )
+
+func init() {
+	govalidator.SetFieldsRequiredByDefault(true)
+}
 
 var dryRun bool
 

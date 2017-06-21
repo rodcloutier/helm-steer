@@ -8,33 +8,34 @@ import (
 )
 
 type ChartSpec struct {
-	Chart       string   `json:"chart"`
-	Devel       string   `json:"devel"`
-	DryRun      bool     `json:"dry-run"`
-	Keyring     string   `json:"keyring"`
-	Namespace   string   `json:"namespace"`
-	NoHooks     bool     `json:"no-hooks"`
-	Set         []string `json:"set"`
-	Timeout     int      `json:"timeout"`
-	TLS         bool     `json:"tls"`
-	TLS_CA_cert string   `json:"tls-ca-cert"`
-	TLS_cert    string   `json:"tls-cert"`
-	TLS_key     string   `json:"tls-key"`
-	TLS_verify  bool     `json:"tls-verify"`
-	Values      []string `json:"values"`
-	Verify      bool     `json:"verify"`
-	Version     string   `json:"version"`
-	Wait        bool     `json:"wait"`
+	// matches(^a-zA-Z0-9$\-\.)
+	Chart       string   `valid:"required" json:"chart"`
+	Devel       string   `valid:"optional" json:"devel"`
+	DryRun      bool     `valid:"optional" json:"dry-run"`
+	Keyring     string   `valid:"optional" json:"keyring"`
+	Namespace   string   `valid:"optional" json:"namespace"`
+	NoHooks     bool     `valid:"optional" json:"no-hooks"`
+	Set         []string `valid:"optional" json:"set"`
+	Timeout     int      `valid:"optional" json:"timeout"`
+	TLS         bool     `valid:"optional" json:"tls"`
+	TLS_CA_cert string   `valid:"optional" json:"tls-ca-cert"`
+	TLS_cert    string   `valid:"optional" json:"tls-cert"`
+	TLS_key     string   `valid:"optional" json:"tls-key"`
+	TLS_verify  bool     `valid:"optional" json:"tls-verify"`
+	Values      []string `valid:"optional" json:"values"`
+	Verify      bool     `valid:"optional" json:"verify"`
+	Version     string   `valid:"semver,optional" json:"version"`
+	Wait        bool     `valid:"optional" json:"wait"`
 
 	// Install specific
-	Name         string `json:"name"`
-	NameTemplate string `json:"name-template"`
-	Replace      bool   `json:"replace"`
+	Name         string `valid:"optional" json:"name"`
+	NameTemplate string `valid:"optional" json:"name-template"`
+	Replace      bool   `valid:"optional" json:"replace"`
 
 	// Upgrade specific
-	RecreatePods bool `json:"recreate-pods"`
-	ResetValues  bool `json:"reset-values"`
-	ReuseValues  bool `json:"reuse-values"`
+	RecreatePods bool `valid:"optional" json:"recreate-pods"`
+	ResetValues  bool `valid:"optional" json:"reset-values"`
+	ReuseValues  bool `valid:"optional" json:"reuse-values"`
 }
 
 func (c *ChartSpec) buildHelmCmdArgs(skippedFields []string) []string {
