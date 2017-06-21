@@ -1,12 +1,14 @@
-package steer
+package plan
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 
 	"github.com/Masterminds/semver"
 	"github.com/deckarep/golang-set"
 	"github.com/ghodss/yaml"
+	"github.com/rodcloutier/helm-steer/pkg/executor"
 	"github.com/rodcloutier/helm-steer/pkg/helm"
 	"k8s.io/helm/pkg/proto/hapi/release"
 )
@@ -23,7 +25,23 @@ type Plan struct {
 	Version    string               `json:"version"`
 }
 
-func (p *Plan) process(namespaces []string) ([]*Command, error) {
+type StackCommand struct {
+	stack Stack
+	executor.BaseCommand
+}
+type StackCommandFactory func(Stack) *StackCommand
+
+func newStackCommand(s Stack, run, undo executor.Action) *StackCommand {
+	return &StackCommand{
+		stack: s,
+		BaseCommand: executor.BaseCommand{
+			RunAction:  run,
+			UndoAction: undo,
+		},
+	}
+}
+
+func (p *Plan) Process(namespaces []string) ([]*StackCommand, error) {
 
 	// TODO do this per namespace ?
 	var isValidNamespace func(string) bool
@@ -94,8 +112,8 @@ func (p *Plan) process(namespaces []string) ([]*Command, error) {
 		return nil, err
 	}
 
-	createCommands := func(s mapset.Set, f CommandFactory) []*Command {
-		cmds := []*Command{}
+	createCommands := func(s mapset.Set, f StackCommandFactory) []*StackCommand {
+		cmds := []*StackCommand{}
 		for r := range s.Iter() {
 			release := r.(string)
 			cmds = append(cmds, f(stackMap[release]))
@@ -103,12 +121,24 @@ func (p *Plan) process(namespaces []string) ([]*Command, error) {
 		return cmds
 	}
 
-	cmds := createCommands(delete, NewDeleteCommand)
-	cmds = append(cmds, createCommands(install, NewInstallCommand)...)
-	cmds = append(cmds, createCommands(upgrade, NewUpgradeCommand)...)
+	noop := func() error { return nil }
+
+	newDeleteCommand := func(s Stack) *StackCommand {
+		return newStackCommand(s, noop, noop)
+	}
+	newInstallCommand := func(s Stack) *StackCommand {
+		return newStackCommand(s, s.Spec.install, noop)
+	}
+	newUpgradeCommand := func(s Stack) *StackCommand {
+		return newStackCommand(s, s.Spec.upgrade, noop)
+	}
+
+	cmds := createCommands(delete, newDeleteCommand)
+	cmds = append(cmds, createCommands(install, newInstallCommand)...)
+	cmds = append(cmds, createCommands(upgrade, newUpgradeCommand)...)
 
 	fmt.Println("Resolving dependencies")
-	cmds, err = ResolveDependencies(cmds)
+	cmds, err = resolveDependencies(cmds)
 
 	return cmds, err
 }
@@ -182,4 +212,79 @@ func Load(planPath string) (*Plan, error) {
 	plan.Conform()
 
 	return &plan, nil
+}
+
+// Returns the name of the release targeted by the command, namespaced
+func (s *StackCommand) namespacedName() string {
+	return s.stack.Spec.Namespace + "." + s.stack.Spec.Name
+}
+
+// Returns the dependencies of the release targeted by the command, namespaced
+func (s *StackCommand) namespacedDeps() []string {
+	deps := []string{}
+	for _, dep := range s.stack.Deps {
+		deps = append(deps, s.stack.Spec.Namespace+"."+dep)
+	}
+	return deps
+}
+
+// resolveDependencies uses topological sort to resolve the command dependencies
+// http://dnaeon.github.io/dependency-graph-resolution-algorithm-in-go/
+func resolveDependencies(cmds []*StackCommand) ([]*StackCommand, error) {
+
+	// A map that contains the name to the actual object
+	cmdNames := make(map[string]*StackCommand)
+
+	// A map that contains the commands and their dependencies
+	cmdDependencies := make(map[string]mapset.Set)
+
+	// Populate the maps
+	for _, cmd := range cmds {
+		name := cmd.namespacedName()
+		cmdNames[name] = cmd
+
+		dependencySet := mapset.NewSet()
+		for _, dep := range cmd.namespacedDeps() {
+			dependencySet.Add(dep)
+		}
+		cmdDependencies[name] = dependencySet
+	}
+
+	// Iteratively find and remove nodes from the graph which have no dependencies.
+	// If at some point there are still nodes in the graph and we cannot find
+	// nodes without dependencies, that means we have a circular dependency
+	var resolved []*StackCommand
+	for len(cmdDependencies) != 0 {
+		// Get all the nodes from the graph which have no dependecies
+		readySet := mapset.NewSet()
+		for name, deps := range cmdDependencies {
+			if deps.Cardinality() == 0 {
+				readySet.Add(name)
+			}
+		}
+
+		// If there aren't any ready nodes, then we have a circular dependency
+		if readySet.Cardinality() == 0 {
+			var g []*StackCommand
+			for name := range cmdDependencies {
+				g = append(g, cmdNames[name])
+			}
+			return g, errors.New("Circular dependency found")
+		}
+
+		// Remove the ready nodes and add them to the resolved graph
+		for name := range readySet.Iter() {
+			delete(cmdDependencies, name.(string))
+			resolved = append(resolved, cmdNames[name.(string)])
+		}
+
+		// Also make sure to remove the ready nodes from the remaining node
+		// dependencies as well
+		for name, deps := range cmdDependencies {
+			diff := deps.Difference(readySet)
+			cmdDependencies[name] = diff
+		}
+	}
+
+	return resolved, nil
 }

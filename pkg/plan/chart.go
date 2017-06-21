@@ -1,4 +1,4 @@
-package steer
+package plan
 
 import (
 	"reflect"
@@ -98,7 +98,7 @@ func (c *ChartSpec) install() error {
 	args := c.buildHelmCmdArgs(skippedFlags)
 	args = append(args, c.Chart)
 
-	return helm.Run("install", args, dryRun)
+	return helm.Run("install", args)
 }
 
 func (c *ChartSpec) upgrade() error {
@@ -112,5 +112,5 @@ func (c *ChartSpec) upgrade() error {
 	args := c.buildHelmCmdArgs(skippedFlags)
 	args = append(args, c.Name, c.Chart)
 
-	return helm.Run("upgrade", args, dryRun)
+	return helm.Run("upgrade", args)
 }
