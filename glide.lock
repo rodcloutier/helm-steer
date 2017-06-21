@@ -1,5 +1,5 @@
-hash: 0fc0ac86f39e917b102e450f864e16ca6e6799c429bca54f4d5ea57d8c779e06
-updated: 2017-06-18T22:27:29.876572941-04:00
+hash: 1da68035916b4e64c30324623f0d6a468ae9534e721078f4bc2ff95c46432a78
+updated: 2017-06-21T11:29:10.2458467-04:00
 imports:
 - name: github.com/BurntSushi/toml
   version: b26d9c308763d68093482582cea63d69be07a0f0
@@ -7,6 +7,8 @@ imports:
   version: a4b9a94ae3157ef89441395f98c6ab4018fcb26a
 - name: github.com/facebookgo/symwalk
   version: 42004b9f322246749dd73ad71008b1f3160c0052
+- name: github.com/fsnotify/fsnotify
+  version: 4da3e2cfbabc9f751898f250b49f2439785783a1
 - name: github.com/ghodss/yaml
   version: 73d445a93680fa1a78ae23a5839bad48f32ba1ee
 - name: github.com/gobwas/glob
@@ -25,10 +27,45 @@ imports:
   - proto
   - ptypes/any
   - ptypes/timestamp
+- name: github.com/hashicorp/hcl
+  version: 392dba7d905ed5d04a5794ba89f558b27e2ba1ca
+  subpackages:
+  - hcl/ast
+  - hcl/parser
+  - hcl/scanner
+  - hcl/strconv
+  - hcl/token
+  - json/parser
+  - json/scanner
+  - json/token
+- name: github.com/inconshreveable/mousetrap
+  version: 76626ae9c91c4f2a10f34cad8ce83ea42c93bb75
+- name: github.com/magiconair/properties
+  version: 51463bfca2576e06c62a8504b5c0f06d61312647
 - name: github.com/Masterminds/semver
   version: 3f0ab6d4ab4bed1c61caf056b63a6e62190c7801
-- name: github.com/urfave/cli
-  version: cf33a9befefdd6c6ea1a236ab6d546e797a62cbf
+- name: github.com/mitchellh/go-homedir
+  version: b8bc1bf767474819792c23f32d8286a45736f1c6
+- name: github.com/mitchellh/mapstructure
+  version: d0303fe809921458f417bcf828397a65db30a7e4
+- name: github.com/pelletier/go-buffruneio
+  version: c37440a7cf42ac63b919c752ca73a85067e05992
+- name: github.com/pelletier/go-toml
+  version: fe7536c3dee2596cdd23ee9976a17c22bdaae286
+- name: github.com/spf13/afero
+  version: 9be650865eab0c12963d8753212f4f9c66cdcf12
+  subpackages:
+  - mem
+- name: github.com/spf13/cast
+  version: acbeb36b902d72a7a4c18e8f3241075e7ab763e4
+- name: github.com/spf13/cobra
+  version: f62e98d28ab7ad31d707ba837a966378465c7b57
+- name: github.com/spf13/jwalterweatherman
+  version: 0efa5202c04663c757d84f90f5219c1250baf94f
+- name: github.com/spf13/pflag
+  version: 9ff6c6923cfffbcd502984b8e0c80539a94968b7
+- name: github.com/spf13/viper
+  version: c1de95864d73a5465492829d7cb2dd422b19ac96
 - name: golang.org/x/net
   version: e90d6d0afc4c315a0d87a568ae68577cc15149a0
   subpackages:
@@ -38,6 +75,15 @@ imports:
   - internal/timeseries
   - lex/httplex
   - trace
+- name: golang.org/x/sys
+  version: 8f0908ab3b2457e2e15403d3697c9ef5cb4b57a9
+  subpackages:
+  - unix
+- name: golang.org/x/text
+  version: 2910a502d2bf9e43193af9d68ca516529614eed3
+  subpackages:
+  - transform
+  - unicode/norm
 - name: google.golang.org/grpc
   version: 8050b9cbc271307e5a716a9d782803d09b0d6f2d
   subpackages:
