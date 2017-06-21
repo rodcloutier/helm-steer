@@ -7,30 +7,44 @@ import (
 	"github.com/rodcloutier/helm-steer/pkg/plan"
 )
 
-var dryRun bool
-
 func Steer(planPath string, namespaces []string, dr bool) error {
 
-	dryRun = dr
+	executor.DryRun = dr
 
 	pl, err := plan.Load(planPath)
 	if err != nil {
 		return err
 	}
 
-	cmds, err := pl.Process(namespaces)
+	cmdArgs, err := pl.Process(namespaces)
 	if err != nil {
 		return err
 	}
 
-	for _, cmd := range cmds {
-
+	// Build the actual commands
+	ranCommands := []executor.Command{}
+	for _, cmdArgs := range cmdArgs {
+		cmd := executor.NewExecutableCommand("helm", cmdArgs.Run)
 		err = cmd.Run()
 		if err != nil {
 			fmt.Println("Error: Last command failed. Undoing previous commands")
-			executor.UndoCommands()
+			// executor.UndoCommands()
+			undoCommands(ranCommands)
 			return err
+		}
+		if len(cmdArgs.Undo) > 0 {
+			undoCmd := executor.NewExecutableCommand("helm", cmdArgs.Undo)
+			ranCommands = append([]executor.Command{undoCmd}, ranCommands...)
 		}
 	}
 	return nil
+}
+
+func undoCommands(cmds []executor.Command) {
+	for _, cmd := range cmds {
+		err := cmd.Run()
+		if err != nil {
+			fmt.Println("Failed to perform undo command %s", cmd)
+		}
+	}
 }

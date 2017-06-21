@@ -8,7 +8,6 @@ import (
 	"github.com/Masterminds/semver"
 	"github.com/deckarep/golang-set"
 	"github.com/ghodss/yaml"
-	"github.com/rodcloutier/helm-steer/pkg/executor"
 	"github.com/rodcloutier/helm-steer/pkg/helm"
 	"k8s.io/helm/pkg/proto/hapi/release"
 )
@@ -25,20 +24,9 @@ type Plan struct {
 	Version    string               `json:"version"`
 }
 
-type StackCommand struct {
-	stack Stack
-	executor.BaseCommand
-}
-type StackCommandFactory func(Stack) *StackCommand
-
-func newStackCommand(s Stack, run, undo executor.Action) *StackCommand {
-	return &StackCommand{
-		stack: s,
-		BaseCommand: executor.BaseCommand{
-			RunAction:  run,
-			UndoAction: undo,
-		},
-	}
+type Command struct {
+	Run  []string
+	Undo []string
 }
 
 type Action int
@@ -49,7 +37,7 @@ const (
 	actionDelete
 )
 
-func (p *Plan) Process(namespaces []string) ([]*StackCommand, error) {
+func (p *Plan) Process(namespaces []string) ([]Command, error) {
 
 	// TODO do this per namespace ?
 	var isValidNamespace func(string) bool
@@ -138,21 +126,28 @@ func (p *Plan) Process(namespaces []string) ([]*StackCommand, error) {
 		return nil, err
 	}
 
-	noop := func() error { return nil }
-
-	commands := map[Action]StackCommandFactory{
-		actionDelete: func(s Stack) *StackCommand {
-			return newStackCommand(s, noop, noop)
+	commands := map[Action]func(Stack) Command{
+		actionInstall: func(s Stack) Command {
+			return Command{
+				Run:  s.Spec.installCmd(),
+				Undo: []string{},
+			}
 		},
-		actionInstall: func(s Stack) *StackCommand {
-			return newStackCommand(s, s.Spec.install, noop)
+		actionDelete: func(s Stack) Command {
+			return Command{
+				Run:  []string{},
+				Undo: []string{},
+			}
 		},
-		actionUpgrade: func(s Stack) *StackCommand {
-			return newStackCommand(s, s.Spec.upgrade, noop)
+		actionUpgrade: func(s Stack) Command {
+			return Command{
+				Run:  s.Spec.upgradeCmd(),
+				Undo: []string{},
+			}
 		},
 	}
 
-	cmds := []*StackCommand{}
+	cmds := []Command{}
 	for _, r := range graph {
 		cmds = append(cmds, commands[r.action](r.stack))
 	}
@@ -165,8 +160,6 @@ func extractUpgrades(known mapset.Set, releasesMap map[string]*release.Release, 
 	upgrade := mapset.NewSet()
 
 	for r := range known.Iter() {
-
-		// TODO check for semver parsable version
 
 		release := r.(string)
 		deployedVersion := releasesMap[release].Chart.Metadata.Version

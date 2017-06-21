@@ -1,10 +1,7 @@
 package helm
 
 import (
-	"fmt"
 	"os"
-	"os/exec"
-	"strings"
 
 	"github.com/ghodss/yaml"
 	"k8s.io/helm/pkg/helm"
@@ -34,26 +31,6 @@ func newClient() helm.Interface {
 	// 	options = append(options, helm.WithTLS(tlscfg))
 	// }
 	return helm.NewClient(options...)
-}
-
-func Run(name string, args []string) error {
-
-	args = append([]string{name}, args...)
-
-	fmt.Printf("helm %s\n", strings.Trim(fmt.Sprint(args), "[]"))
-	if dryRun {
-		return nil
-	}
-
-	cmd := exec.Command("helm", args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	err := cmd.Start()
-	if err != nil {
-		return err
-	}
-	err = cmd.Wait()
-	return err
 }
 
 func List() ([]*release.Release, error) {

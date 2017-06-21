@@ -3,8 +3,6 @@ package plan
 import (
 	"reflect"
 	"sort"
-
-	"github.com/rodcloutier/helm-steer/pkg/helm"
 )
 
 type ChartSpec struct {
@@ -87,7 +85,7 @@ func (c *ChartSpec) buildHelmCmdArgs(skippedFields []string) []string {
 	return cmd
 }
 
-func (c *ChartSpec) install() error {
+func (c *ChartSpec) installCmd() []string {
 	skippedFlags := []string{
 		"chart",
 		"recreate-pods",
@@ -95,13 +93,12 @@ func (c *ChartSpec) install() error {
 		"reuse-values",
 	}
 
-	args := c.buildHelmCmdArgs(skippedFlags)
-	args = append(args, c.Chart)
-
-	return helm.Run("install", args)
+	args := []string{"install"}
+	args = append(args, c.buildHelmCmdArgs(skippedFlags)...)
+	return append(args, c.Chart)
 }
 
-func (c *ChartSpec) upgrade() error {
+func (c *ChartSpec) upgradeCmd() []string {
 	skippedFlags := []string{
 		"chart",
 		"name",
@@ -109,8 +106,7 @@ func (c *ChartSpec) upgrade() error {
 		"replace",
 	}
 
-	args := c.buildHelmCmdArgs(skippedFlags)
-	args = append(args, c.Name, c.Chart)
-
-	return helm.Run("upgrade", args)
+	args := []string{"upgrade"}
+	args = append(args, c.buildHelmCmdArgs(skippedFlags)...)
+	return append(args, c.Name, c.Chart)
 }

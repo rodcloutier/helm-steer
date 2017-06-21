@@ -2,44 +2,47 @@ package executor
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
+	"strings"
 )
 
-type Action func() error
-
 type Command interface {
-	// TODO String() string
 	Run() error
-	Undo() error
 }
 
-type BaseCommand struct {
-	RunAction  Action
-	UndoAction Action
+type executableCommand struct {
+	entrypoint string
+	args       []string
 }
 
-var undoStack []Command
+var DryRun bool
 
 func init() {
-	undoStack = []Command{}
+	DryRun = false
 }
 
-func (c *BaseCommand) Run() error {
-	err := c.RunAction()
-	if err == nil {
-		undoStack = append([]Command{c}, undoStack...)
+func NewExecutableCommand(e string, args []string) Command {
+	return &executableCommand{
+		entrypoint: e,
+		args:       args,
 	}
+}
+
+func (c executableCommand) Run() error {
+
+	fmt.Printf("%s %s\n", c.entrypoint, strings.Trim(fmt.Sprint(c.args), "[]"))
+	if DryRun {
+		return nil
+	}
+
+	cmd := exec.Command(c.entrypoint, c.args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	err := cmd.Start()
+	if err != nil {
+		return err
+	}
+	err = cmd.Wait()
 	return err
-}
-
-func (c *BaseCommand) Undo() error {
-	return c.UndoAction()
-}
-
-func UndoCommands() {
-	for _, cmd := range undoStack {
-		err := cmd.Undo()
-		if err != nil {
-			fmt.Println("Error: Undo command failed")
-		}
-	}
 }
