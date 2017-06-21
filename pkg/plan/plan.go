@@ -41,6 +41,14 @@ func newStackCommand(s Stack, run, undo executor.Action) *StackCommand {
 	}
 }
 
+type Action int
+
+const (
+	actionInstall Action = iota
+	actionUpgrade
+	actionDelete
+)
+
 func (p *Plan) Process(namespaces []string) ([]*StackCommand, error) {
 
 	// TODO do this per namespace ?
@@ -112,35 +120,44 @@ func (p *Plan) Process(namespaces []string) ([]*StackCommand, error) {
 		return nil, err
 	}
 
-	createCommands := func(s mapset.Set, f StackCommandFactory) []*StackCommand {
-		cmds := []*StackCommand{}
+	insertNodes := func(g dependencyGraph, s mapset.Set, a Action) dependencyGraph {
 		for r := range s.Iter() {
-			release := r.(string)
-			cmds = append(cmds, f(stackMap[release]))
+			name := r.(string)
+			g = append(g, &dependencyNode{stack: stackMap[name], action: a})
 		}
-		return cmds
+		return g
+	}
+
+	graph := dependencyGraph{}
+	graph = insertNodes(graph, delete, actionDelete)
+	graph = insertNodes(graph, install, actionInstall)
+	graph = insertNodes(graph, upgrade, actionUpgrade)
+
+	graph, err = resolveDependencies(graph)
+	if err != nil {
+		return nil, err
 	}
 
 	noop := func() error { return nil }
 
-	newDeleteCommand := func(s Stack) *StackCommand {
-		return newStackCommand(s, noop, noop)
-	}
-	newInstallCommand := func(s Stack) *StackCommand {
-		return newStackCommand(s, s.Spec.install, noop)
-	}
-	newUpgradeCommand := func(s Stack) *StackCommand {
-		return newStackCommand(s, s.Spec.upgrade, noop)
+	commands := map[Action]StackCommandFactory{
+		actionDelete: func(s Stack) *StackCommand {
+			return newStackCommand(s, noop, noop)
+		},
+		actionInstall: func(s Stack) *StackCommand {
+			return newStackCommand(s, s.Spec.install, noop)
+		},
+		actionUpgrade: func(s Stack) *StackCommand {
+			return newStackCommand(s, s.Spec.upgrade, noop)
+		},
 	}
 
-	cmds := createCommands(delete, newDeleteCommand)
-	cmds = append(cmds, createCommands(install, newInstallCommand)...)
-	cmds = append(cmds, createCommands(upgrade, newUpgradeCommand)...)
+	cmds := []*StackCommand{}
+	for _, r := range graph {
+		cmds = append(cmds, commands[r.action](r.stack))
+	}
 
-	fmt.Println("Resolving dependencies")
-	cmds, err = resolveDependencies(cmds)
-
-	return cmds, err
+	return cmds, nil
 }
 
 func extractUpgrades(known mapset.Set, releasesMap map[string]*release.Release, stackMap map[string]Stack) (mapset.Set, error) {
@@ -214,50 +231,58 @@ func Load(planPath string) (*Plan, error) {
 	return &plan, nil
 }
 
+// --- Dependency resolution --------------------------------------------------
+
+type dependencyNode struct {
+	stack  Stack
+	action Action
+}
+type dependencyGraph []*dependencyNode
+
 // Returns the name of the release targeted by the command, namespaced
-func (s *StackCommand) namespacedName() string {
-	return s.stack.Spec.Namespace + "." + s.stack.Spec.Name
+func (n *dependencyNode) namespacedName() string {
+	return n.stack.Spec.Namespace + "." + n.stack.Spec.Name
 }
 
 // Returns the dependencies of the release targeted by the command, namespaced
-func (s *StackCommand) namespacedDeps() []string {
+func (n *dependencyNode) namespacedDeps() []string {
 	deps := []string{}
-	for _, dep := range s.stack.Deps {
-		deps = append(deps, s.stack.Spec.Namespace+"."+dep)
+	for _, dep := range n.stack.Deps {
+		deps = append(deps, n.stack.Spec.Namespace+"."+dep)
 	}
 	return deps
 }
 
 // resolveDependencies uses topological sort to resolve the command dependencies
 // http://dnaeon.github.io/dependency-graph-resolution-algorithm-in-go/
-func resolveDependencies(cmds []*StackCommand) ([]*StackCommand, error) {
+func resolveDependencies(graph dependencyGraph) (dependencyGraph, error) {
 
 	// A map that contains the name to the actual object
-	cmdNames := make(map[string]*StackCommand)
+	nodeNames := make(map[string]*dependencyNode)
 
-	// A map that contains the commands and their dependencies
-	cmdDependencies := make(map[string]mapset.Set)
+	// A map that contains the node and their dependencies
+	nodeDependencies := make(map[string]mapset.Set)
 
 	// Populate the maps
-	for _, cmd := range cmds {
-		name := cmd.namespacedName()
-		cmdNames[name] = cmd
+	for _, node := range graph {
+		name := node.namespacedName()
+		nodeNames[name] = node
 
 		dependencySet := mapset.NewSet()
-		for _, dep := range cmd.namespacedDeps() {
+		for _, dep := range node.namespacedDeps() {
 			dependencySet.Add(dep)
 		}
-		cmdDependencies[name] = dependencySet
+		nodeDependencies[name] = dependencySet
 	}
 
 	// Iteratively find and remove nodes from the graph which have no dependencies.
 	// If at some point there are still nodes in the graph and we cannot find
 	// nodes without dependencies, that means we have a circular dependency
-	var resolved []*StackCommand
-	for len(cmdDependencies) != 0 {
+	var resolved []*dependencyNode
+	for len(nodeDependencies) != 0 {
 		// Get all the nodes from the graph which have no dependecies
 		readySet := mapset.NewSet()
-		for name, deps := range cmdDependencies {
+		for name, deps := range nodeDependencies {
 			if deps.Cardinality() == 0 {
 				readySet.Add(name)
 			}
@@ -265,24 +290,24 @@ func resolveDependencies(cmds []*StackCommand) ([]*StackCommand, error) {
 
 		// If there aren't any ready nodes, then we have a circular dependency
 		if readySet.Cardinality() == 0 {
-			var g []*StackCommand
-			for name := range cmdDependencies {
-				g = append(g, cmdNames[name])
+			var g []*dependencyNode
+			for name := range nodeDependencies {
+				g = append(g, nodeNames[name])
 			}
 			return g, errors.New("Circular dependency found")
 		}
 
 		// Remove the ready nodes and add them to the resolved graph
 		for name := range readySet.Iter() {
-			delete(cmdDependencies, name.(string))
-			resolved = append(resolved, cmdNames[name.(string)])
+			delete(nodeDependencies, name.(string))
+			resolved = append(resolved, nodeNames[name.(string)])
 		}
 
 		// Also make sure to remove the ready nodes from the remaining node
 		// dependencies as well
-		for name, deps := range cmdDependencies {
+		for name, deps := range nodeDependencies {
 			diff := deps.Difference(readySet)
-			cmdDependencies[name] = diff
+			nodeDependencies[name] = diff
 		}
 	}
 
