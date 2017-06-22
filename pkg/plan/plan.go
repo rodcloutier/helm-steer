@@ -62,6 +62,7 @@ func (p *Plan) Process(namespaces []string) ([]Command, error) {
 	// helm list
 	currentReleases, err := helm.List()
 	if err != nil {
+		fmt.Println("Error: Failed to fetch helm list: %s", err)
 		return nil, err
 	}
 
@@ -124,8 +125,10 @@ func (p *Plan) Process(namespaces []string) ([]Command, error) {
 	graph = insertNodes(graph, install, actionInstall)
 	graph = insertNodes(graph, upgrade, actionUpgrade)
 
+	fmt.Println("Resolving dependencies")
 	graph, err = resolveDependencies(graph)
 	if err != nil {
+		fmt.Printf("Error: Failed to resolve dependencies: %s\n", err)
 		return nil, err
 	}
 
@@ -161,16 +164,28 @@ func extractUpgrades(known mapset.Set, releasesMap map[string]*release.Release, 
 	for r := range known.Iter() {
 
 		release := r.(string)
-		deployedVersion := releasesMap[release].Chart.Metadata.Version
 		specifiedVersion := stackMap[release].Spec.Version
 
+		// No version is specified, we must asssume that we will potentially
+		// upgrade.
+		// (rod) Maybe we could eventually do a search to find out if
+		// there is a potential upgrade
+		if specifiedVersion == "" {
+			upgrade.Add(release)
+			continue
+		}
+
+		deployedVersion := releasesMap[release].Chart.Metadata.Version
 		deployedSemver, err := semver.NewVersion(deployedVersion)
 		if err != nil {
+			fmt.Printf("Error: Failed to parse semver `%s`\n", deployedVersion)
 			return nil, err
 		}
 
-		equalConstraint, err := semver.NewConstraint("= " + specifiedVersion)
+		constraint := "= " + specifiedVersion
+		equalConstraint, err := semver.NewConstraint(constraint)
 		if err != nil {
+			fmt.Printf("Error: Failed to create constraint `%s`\n", constraint)
 			return nil, err
 		}
 

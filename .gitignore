@@ -2,3 +2,4 @@ _dist/
 vendor/
 steer*
 plan.yaml
+*.tgz

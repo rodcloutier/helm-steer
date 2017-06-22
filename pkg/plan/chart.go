@@ -89,7 +89,13 @@ func (c *ChartSpec) buildHelmCmdArgs(skippedFields []string) []string {
 
 // String returns the string representation of a ChartSpec
 func (c ChartSpec) String() string {
-	return fmt.Sprintf("%s chart: %s-%s namespace: %s", c.Name, c.Chart, c.Version, c.Namespace)
+
+	chart := c.Chart
+	if c.Version != "" {
+		chart = fmt.Sprintf("%s-%s", chart, c.Version)
+	}
+
+	return fmt.Sprintf("%s chart: %s namespace: %s", c.Name, chart, c.Namespace)
 }
 
 func (c *ChartSpec) installCmd() []string {
