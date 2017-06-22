@@ -23,6 +23,8 @@ func Steer(outputWriter, debugWriter io.Writer, planPath string, namespaces []st
 	// Build the actual commands
 	ranCommands := []executor.Command{}
 	for _, cmdArgs := range cmdArgs {
+
+		fmt.Println(cmdArgs.Description)
 		cmd := executor.NewExecutableCommand("helm", cmdArgs.Run)
 		fmt.Fprintf(debugWriter, "Executing `%s` ...\n", cmd)
 		if dryRun {

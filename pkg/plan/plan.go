@@ -25,8 +25,9 @@ type Plan struct {
 }
 
 type Command struct {
-	Run  []string
-	Undo []string
+	Description string
+	Run         []string
+	Undo        []string
 }
 
 type Action int
@@ -100,7 +101,10 @@ func (p *Plan) Process(namespaces []string) ([]Command, error) {
 	}
 
 	install := specifiedReleases.Difference(releases)
-	delete := releases.Difference(specifiedReleases)
+
+	// TODO (rod): delete is a special case where we do not have a Stack defined
+	// we need to see how to handle this
+	// delete := releases.Difference(specifiedReleases)
 
 	known := specifiedReleases.Intersect(releases)
 	upgrade, err := extractUpgrades(known, releasesMap, stackMap)
@@ -117,7 +121,6 @@ func (p *Plan) Process(namespaces []string) ([]Command, error) {
 	}
 
 	graph := dependencyGraph{}
-	graph = insertNodes(graph, delete, actionDelete)
 	graph = insertNodes(graph, install, actionInstall)
 	graph = insertNodes(graph, upgrade, actionUpgrade)
 
@@ -129,20 +132,16 @@ func (p *Plan) Process(namespaces []string) ([]Command, error) {
 	commands := map[Action]func(Stack) Command{
 		actionInstall: func(s Stack) Command {
 			return Command{
-				Run:  s.Spec.installCmd(),
-				Undo: []string{},
-			}
-		},
-		actionDelete: func(s Stack) Command {
-			return Command{
-				Run:  []string{},
-				Undo: []string{},
+				Description: fmt.Sprintf("Installing %s", s),
+				Run:         s.Spec.installCmd(),
+				Undo:        []string{},
 			}
 		},
 		actionUpgrade: func(s Stack) Command {
 			return Command{
-				Run:  s.Spec.upgradeCmd(),
-				Undo: []string{},
+				Description: fmt.Sprintf("Upgrading %s", s),
+				Run:         s.Spec.upgradeCmd(),
+				Undo:        []string{},
 			}
 		},
 	}
@@ -188,20 +187,25 @@ func extractUpgrades(known mapset.Set, releasesMap map[string]*release.Release, 
 }
 
 // Conform will apply the name and namespaces to the contained Stack
-func (p *Plan) Conform() {
+func (p *Plan) conform() {
 	for namespaceName, ns := range p.Namespaces {
 		for stackName, _ := range ns {
 			stack := ns[stackName]
-			stack.Conform(namespaceName, stackName)
+			stack.conform(namespaceName, stackName)
 			ns[stackName] = stack
 		}
 	}
 }
 
-func (s *Stack) Conform(namespaceName, stackName string) {
+func (s *Stack) conform(namespaceName, stackName string) {
 	// TODO should we validate that the names correspond to the expected value?
 	s.Spec.Name = stackName
 	s.Spec.Namespace = namespaceName
+}
+
+// String returns the string representation of a stack
+func (s Stack) String() string {
+	return fmt.Sprintf("%s", s.Spec)
 }
 
 // Load will load a plan file and return the plan
@@ -219,7 +223,7 @@ func Load(planPath string) (*Plan, error) {
 		return nil, err
 	}
 
-	plan.Conform()
+	plan.conform()
 
 	return &plan, nil
 }

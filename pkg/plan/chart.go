@@ -1,11 +1,13 @@
 package plan
 
 import (
+	"fmt"
 	"reflect"
 	"sort"
 )
 
 type ChartSpec struct {
+	// Common
 	Chart       string   `json:"chart"`
 	Devel       string   `json:"devel"`
 	DryRun      bool     `json:"dry-run"`
@@ -83,6 +85,11 @@ func (c *ChartSpec) buildHelmCmdArgs(skippedFields []string) []string {
 	}
 
 	return cmd
+}
+
+// String returns the string representation of a ChartSpec
+func (c ChartSpec) String() string {
+	return fmt.Sprintf("%s chart: %s-%s namespace: %s", c.Name, c.Chart, c.Version, c.Namespace)
 }
 
 func (c *ChartSpec) installCmd() []string {
