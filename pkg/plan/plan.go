@@ -38,6 +38,8 @@ const (
 	actionDelete
 )
 
+// Process will process the plan to extract a dependencies sorted list
+// of operations to perform
 func (p *Plan) Process(namespaces []string) ([]Operation, error) {
 
 	// TODO (rod) do this per namespace ?
@@ -204,6 +206,36 @@ func (p *Plan) conform() {
 	}
 }
 
+func (p Plan) verify() (bool, error) {
+
+	if len(p.Namespaces) == 1 {
+		return true, nil
+	}
+
+	// We need to make sure that all release names are unique
+	names := make([]mapset.Set, len(p.Namespaces))
+	i := 0
+	for _, ns := range p.Namespaces {
+		s := mapset.NewSet()
+		for name := range ns {
+			s.Add(name)
+		}
+		names[i] = s
+		i++
+	}
+
+	duplicated := names[0]
+	for _, n := range names[1:] {
+		duplicated = duplicated.Intersect(n)
+	}
+
+	if duplicated.Cardinality() > 0 {
+		return false, fmt.Errorf("Error: Found duplicated release name %s", duplicated)
+	}
+
+	return true, nil
+}
+
 func (s *Stack) conform(namespaceName, stackName string) {
 	// TODO should we validate that the names correspond to the expected value?
 	s.Spec.Name = stackName
@@ -222,12 +254,20 @@ func Load(planPath string) (*Plan, error) {
 	if err != nil {
 		return nil, err
 	}
+	return loadString(content)
+}
 
+func loadString(content []byte) (*Plan, error) {
 	var plan Plan
-	err = yaml.Unmarshal(content, &plan)
+	err := yaml.Unmarshal(content, &plan)
 	if err != nil {
 		fmt.Println("err:%v\n", err)
 		return nil, err
+	}
+
+	valid, err := plan.verify()
+	if !valid {
+		return &plan, err
 	}
 
 	plan.conform()
@@ -263,12 +303,12 @@ func createDependencyGraph(sets map[Action]mapset.Set, stackMap map[string]Stack
 }
 
 // Returns the name of the release targeted by the node, namespaced
-func (n *dependencyNode) namespacedName() string {
+func (n *dependencyNode) name() string {
 	return n.stack.Spec.Namespace + "." + n.stack.Spec.Name
 }
 
 // Returns the dependencies of the release targeted by the node, namespaced
-func (n *dependencyNode) namespacedDeps() []string {
+func (n *dependencyNode) deps() []string {
 	deps := []string{}
 	for _, dep := range n.stack.Deps {
 		deps = append(deps, n.stack.Spec.Namespace+"."+dep)
@@ -288,11 +328,11 @@ func resolveDependencies(graph dependencyGraph) (dependencyGraph, error) {
 
 	// Populate the maps
 	for _, node := range graph {
-		name := node.namespacedName()
+		name := node.name()
 		nodeNames[name] = node
 
 		dependencySet := mapset.NewSet()
-		for _, dep := range node.namespacedDeps() {
+		for _, dep := range node.deps() {
 			dependencySet.Add(dep)
 		}
 		nodeDependencies[name] = dependencySet

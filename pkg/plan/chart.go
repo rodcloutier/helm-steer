@@ -61,6 +61,11 @@ func (c *ChartSpec) buildHelmCmdArgs(skippedFields []string) []string {
 
 		name = "--" + name
 		valueField := val.Field(i)
+
+		if !valueField.CanInterface() {
+			// The value is not exported, skip it
+			continue
+		}
 		value := reflect.ValueOf(valueField.Interface())
 
 		switch kind := typeField.Type.Kind(); kind {
