@@ -24,7 +24,7 @@ type Plan struct {
 	Version    string               `json:"version"`
 }
 
-type Command struct {
+type Operation struct {
 	Description string
 	Run         []string
 	Undo        []string
@@ -38,16 +38,11 @@ const (
 	actionDelete
 )
 
-func (p *Plan) Process(namespaces []string) ([]Command, error) {
+func (p *Plan) Process(namespaces []string) ([]Operation, error) {
 
-	// TODO do this per namespace ?
-	var isValidNamespace func(string) bool
-
-	if len(namespaces) == 0 {
-		isValidNamespace = func(string) bool {
-			return true
-		}
-	} else {
+	// TODO (rod) do this per namespace ?
+	isValidNamespace := func(string) bool { return true }
+	if len(namespaces) != 0 {
 		namespacesMap := map[string]bool{}
 		for _, ns := range namespaces {
 			namespacesMap[ns] = true
@@ -59,19 +54,14 @@ func (p *Plan) Process(namespaces []string) ([]Command, error) {
 	}
 
 	// List the currently installed chart deployments
-	// helm list
 	currentReleases, err := helm.List()
 	if err != nil {
 		fmt.Println("Error: Failed to fetch helm list: %s", err)
 		return nil, err
 	}
 
-	releases := mapset.NewSet()
-	releasesMap := make(map[string]*release.Release)
-
 	specifiedReleases := mapset.NewSet()
 	stackMap := make(map[string]Stack)
-
 	for namespaceName, ns := range p.Namespaces {
 		if !isValidNamespace(namespaceName) {
 			continue
@@ -88,6 +78,8 @@ func (p *Plan) Process(namespaces []string) ([]Command, error) {
 		return nil, nil
 	}
 
+	releases := mapset.NewSet()
+	releasesMap := make(map[string]*release.Release)
 	for _, r := range currentReleases {
 		if !isValidNamespace(r.Namespace) {
 			continue
@@ -101,47 +93,47 @@ func (p *Plan) Process(namespaces []string) ([]Command, error) {
 		releasesMap[key] = r
 	}
 
-	install := specifiedReleases.Difference(releases)
-
 	// TODO (rod): delete is a special case where we do not have a Stack defined
 	// we need to see how to handle this
 	// delete := releases.Difference(specifiedReleases)
 
+	install := specifiedReleases.Difference(releases)
 	known := specifiedReleases.Intersect(releases)
 	upgrade, err := extractUpgrades(known, releasesMap, stackMap)
 	if err != nil {
 		return nil, err
 	}
 
-	insertNodes := func(g dependencyGraph, s mapset.Set, a Action) dependencyGraph {
-		for r := range s.Iter() {
-			name := r.(string)
-			g = append(g, &dependencyNode{stack: stackMap[name], action: a})
-		}
-		return g
-	}
-
-	graph := dependencyGraph{}
-	graph = insertNodes(graph, install, actionInstall)
-	graph = insertNodes(graph, upgrade, actionUpgrade)
-
 	fmt.Println("Resolving dependencies")
+
+	graph := createDependencyGraph(map[Action]mapset.Set{
+		actionInstall: install,
+		actionUpgrade: upgrade,
+	}, stackMap)
+
 	graph, err = resolveDependencies(graph)
 	if err != nil {
 		fmt.Printf("Error: Failed to resolve dependencies: %s\n", err)
 		return nil, err
 	}
 
-	commands := map[Action]func(Stack) Command{
-		actionInstall: func(s Stack) Command {
-			return Command{
+	fmt.Println("Creating list of operations to perform")
+	return createOperations(graph)
+}
+
+// createOperations creates a list of operations based on the specified dependency graph
+func createOperations(graph dependencyGraph) ([]Operation, error) {
+
+	operations := map[Action]func(Stack) Operation{
+		actionInstall: func(s Stack) Operation {
+			return Operation{
 				Description: fmt.Sprintf("Installing %s", s),
 				Run:         s.Spec.installCmd(),
 				Undo:        []string{},
 			}
 		},
-		actionUpgrade: func(s Stack) Command {
-			return Command{
+		actionUpgrade: func(s Stack) Operation {
+			return Operation{
 				Description: fmt.Sprintf("Upgrading %s", s),
 				Run:         s.Spec.upgradeCmd(),
 				Undo:        []string{},
@@ -149,12 +141,12 @@ func (p *Plan) Process(namespaces []string) ([]Command, error) {
 		},
 	}
 
-	cmds := []Command{}
+	ops := []Operation{}
 	for _, r := range graph {
-		cmds = append(cmds, commands[r.action](r.stack))
+		ops = append(ops, operations[r.action](r.stack))
 	}
 
-	return cmds, nil
+	return ops, nil
 }
 
 func extractUpgrades(known mapset.Set, releasesMap map[string]*release.Release, stackMap map[string]Stack) (mapset.Set, error) {
@@ -249,14 +241,33 @@ type dependencyNode struct {
 	stack  Stack
 	action Action
 }
+
 type dependencyGraph []*dependencyNode
 
-// Returns the name of the release targeted by the command, namespaced
+func createDependencyGraph(sets map[Action]mapset.Set, stackMap map[string]Stack) dependencyGraph {
+
+	insertNodes := func(g dependencyGraph, s mapset.Set, a Action) dependencyGraph {
+		for r := range s.Iter() {
+			name := r.(string)
+			g = append(g, &dependencyNode{stack: stackMap[name], action: a})
+		}
+		return g
+	}
+
+	graph := dependencyGraph{}
+	for action, set := range sets {
+		graph = insertNodes(graph, set, action)
+	}
+
+	return graph
+}
+
+// Returns the name of the release targeted by the node, namespaced
 func (n *dependencyNode) namespacedName() string {
 	return n.stack.Spec.Namespace + "." + n.stack.Spec.Name
 }
 
-// Returns the dependencies of the release targeted by the command, namespaced
+// Returns the dependencies of the release targeted by the node, namespaced
 func (n *dependencyNode) namespacedDeps() []string {
 	deps := []string{}
 	for _, dep := range n.stack.Deps {
@@ -265,7 +276,7 @@ func (n *dependencyNode) namespacedDeps() []string {
 	return deps
 }
 
-// resolveDependencies uses topological sort to resolve the command dependencies
+// resolveDependencies uses topological sort to resolve the node dependencies
 // http://dnaeon.github.io/dependency-graph-resolution-algorithm-in-go/
 func resolveDependencies(graph dependencyGraph) (dependencyGraph, error) {
 
