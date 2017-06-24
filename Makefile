@@ -17,10 +17,6 @@ install: bootstrap build
 .PHONY: hookInstall
 hookInstall: bootstrap build
 
-.PHONY: generate
-generate:
-	go generate ./pkg/commands/.
-
 .PHONY: build
 build: #generate
 	go build -o steer$(EXT) -ldflags $(LDFLAGS) ./main.go
@@ -29,11 +25,11 @@ build: #generate
 dist: generate
 	mkdir -p $(DIST)
 	GOOS=linux GOARCH=amd64 go build -o steer -ldflags $(LDFLAGS) ./main.go
-	tar -zcvf $(DIST)/helm-template-linux-$(VERSION).tgz steer README.md LICENSE.txt plugin.yaml
+	tar -zcvf $(DIST)/helm-steer-linux-$(VERSION).tgz steer README.md LICENSE.txt plugin.yaml
 	GOOS=darwin GOARCH=amd64 go build -o steer -ldflags $(LDFLAGS) ./main.go
-	tar -zcvf $(DIST)/helm-template-macos-$(VERSION).tgz steer README.md LICENSE.txt plugin.yaml
+	tar -zcvf $(DIST)/helm-steer-macos-$(VERSION).tgz steer README.md LICENSE.txt plugin.yaml
 	GOOS=windows GOARCH=amd64 go build -o steer.exe -ldflags $(LDFLAGS) ./main.go
-	tar -zcvf $(DIST)/helm-template-windows-$(VERSION).tgz steer.exe README.md LICENSE.txt plugin.yaml
+	tar -zcvf $(DIST)/helm-steer-windows-$(VERSION).tgz steer.exe README.md LICENSE.txt plugin.yaml
 
 .PHONY: bootstrap
 bootstrap:
