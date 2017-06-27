@@ -15,17 +15,17 @@ func Steer(outputWriter, debugWriter io.Writer, planPath string, namespaces []st
 		return err
 	}
 
-	cmdArgs, err := pl.Process(namespaces)
+	operations, err := pl.Process(namespaces)
 	if err != nil {
 		return err
 	}
 
 	// Build the actual commands
-	ranCommands := []executor.Command{}
-	for _, cmdArgs := range cmdArgs {
-
-		fmt.Println(cmdArgs.Description)
-		cmd := executor.NewExecutableCommand("helm", cmdArgs.Run)
+	operationStack := []plan.AtomicOperation{}
+	for _, operation := range operations {
+		run := operation.Run
+		fmt.Println(run.Description)
+		cmd := executor.NewExecutableCommand("helm", run.Command)
 		fmt.Fprintf(debugWriter, "Executing `%s` ...\n", cmd)
 		if dryRun {
 			continue
@@ -34,19 +34,19 @@ func Steer(outputWriter, debugWriter io.Writer, planPath string, namespaces []st
 		if err != nil {
 			fmt.Println("Error: Last command failed. Undoing previous commands")
 			// Undo the commands
-			for _, undoCmd := range ranCommands {
-				fmt.Fprintf(debugWriter, "Executing `%s` ...\n", undoCmd)
-				err := undoCmd.Run(outputWriter)
+			for _, operation := range operationStack {
+				undo := operation.Undo
+				cmd := executor.NewExecutableCommand("helm", undo.Command)
+				fmt.Println(undo.Description)
+				fmt.Fprintf(debugWriter, "Executing `%s` ...\n", cmd)
+				err := cmd.Run(outputWriter)
 				if err != nil {
-					fmt.Println("Failed to perform undo command %s", cmd)
+					fmt.Println("Failed while undoing command")
 				}
 			}
 			return err
 		}
-		if len(cmdArgs.Undo) > 0 {
-			undoCmd := executor.NewExecutableCommand("helm", cmdArgs.Undo)
-			ranCommands = append([]executor.Command{undoCmd}, ranCommands...)
-		}
+		operationStack = append([]plan.AtomicOperation{operation}, operationStack...)
 	}
 	return nil
 }

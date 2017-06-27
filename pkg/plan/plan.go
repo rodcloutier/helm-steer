@@ -8,8 +8,9 @@ import (
 	"github.com/Masterminds/semver"
 	"github.com/deckarep/golang-set"
 	"github.com/ghodss/yaml"
-	"github.com/rodcloutier/helm-steer/pkg/helm"
 	"k8s.io/helm/pkg/proto/hapi/release"
+
+	"github.com/rodcloutier/helm-steer/pkg/helm"
 )
 
 type Action int
@@ -30,8 +31,12 @@ type Plan struct {
 
 type Operation struct {
 	Description string
-	Run         []string
-	Undo        []string
+	Command     []string
+}
+
+type AtomicOperation struct {
+	Run  Operation
+	Undo Operation
 }
 
 const (
@@ -42,7 +47,7 @@ const (
 
 // Process will process the plan to extract a dependencies sorted list
 // of operations to perform
-func (p *Plan) Process(namespaces []string) ([]Operation, error) {
+func (p *Plan) Process(namespaces []string) ([]AtomicOperation, error) {
 
 	// TODO (rod) do this per namespace ?
 	isValidNamespace := func(string) bool { return true }
@@ -141,26 +146,36 @@ func (p *Plan) Process(namespaces []string) ([]Operation, error) {
 }
 
 // createOperations creates a list of operations based on the specified dependency graph
-func createOperations(graph dependencyGraph) ([]Operation, error) {
+func createOperations(graph dependencyGraph) ([]AtomicOperation, error) {
 
-	operations := map[Action]func(Stack) Operation{
-		actionInstall: func(s Stack) Operation {
-			return Operation{
-				Description: fmt.Sprintf("Installing %s", s),
-				Run:         s.Spec.installCmd(),
-				Undo:        s.Spec.deleteCmd(),
+	operations := map[Action]func(Stack) AtomicOperation{
+		actionInstall: func(s Stack) AtomicOperation {
+			return AtomicOperation{
+				Run: Operation{
+					Description: fmt.Sprintf("Installing %s", s),
+					Command:     s.Spec.installCmd(),
+				},
+				Undo: Operation{
+					Description: fmt.Sprintf("Deleting %s", s),
+					Command:     s.Spec.deleteCmd(),
+				},
 			}
 		},
-		actionUpgrade: func(s Stack) Operation {
-			return Operation{
-				Description: fmt.Sprintf("Upgrading %s", s),
-				Run:         s.Spec.upgradeCmd(),
-				Undo:        s.Spec.rollbackCmd(),
+		actionUpgrade: func(s Stack) AtomicOperation {
+			return AtomicOperation{
+				Run: Operation{
+					Description: fmt.Sprintf("Upgrading %s", s),
+					Command:     s.Spec.upgradeCmd(),
+				},
+				Undo: Operation{
+					Description: fmt.Sprintf("Rollback on %s", s),
+					Command:     s.Spec.rollbackCmd(),
+				},
 			}
 		},
 	}
 
-	ops := []Operation{}
+	ops := []AtomicOperation{}
 	for _, r := range graph {
 		s := r.(Stack)
 		ops = append(ops, operations[s.action](s))
@@ -176,7 +191,7 @@ func extractUpgrades(known mapset.Set, releasesMap map[string]*release.Release, 
 	for r := range known.Iter() {
 
 		release := r.(string)
-		specifiedVersion := stackMap[release].Spec.Version
+		specifiedVersion := stackMap[release].Version()
 
 		// No version is specified, we must asssume that we will potentially
 		// upgrade.
@@ -284,10 +299,9 @@ func loadString(content []byte) (*Plan, error) {
 
 // --- stack ------------------------------------------------------------------
 
-func (s *Stack) conform(namespaceName, stackName string) {
+func (s *Stack) conform(namespace, name string) {
 	// TODO should we validate that the names correspond to the expected value?
-	s.Spec.Name = stackName
-	s.Spec.Namespace = namespaceName
+	s.Spec.Conform(namespace, name)
 }
 
 // String returns the string representation of a stack
@@ -296,11 +310,15 @@ func (s Stack) String() string {
 }
 
 func (s Stack) Name() string {
-	return s.Spec.Name
+	return s.Spec.name
 }
 
 func (s Stack) Deps() []string {
 	return s.Depends
+}
+
+func (s Stack) Version() string {
+	return s.Spec.Version()
 }
 
 // --- Dependency resolution --------------------------------------------------
