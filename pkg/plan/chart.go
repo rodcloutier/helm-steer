@@ -128,3 +128,11 @@ func (c *ChartSpec) upgradeCmd() []string {
 	args = append(args, c.buildHelmCmdArgs(skippedFlags)...)
 	return append(args, c.Name, c.Chart)
 }
+
+func (c *ChartSpec) rollbackCmd() []string {
+	return []string{}
+}
+
+func (c *ChartSpec) deleteCmd() []string {
+	return []string{}
+}

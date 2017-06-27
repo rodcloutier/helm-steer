@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"strings"
 
 	"github.com/Masterminds/semver"
 	"github.com/deckarep/golang-set"
@@ -102,6 +101,9 @@ func (p *Plan) Process(namespaces []string) ([]Operation, error) {
 	// we need to see how to handle this
 	// delete := releases.Difference(specifiedReleases)
 
+	/// TODO (rod): Validate that the chart names match the same release name
+	// in the same namespace
+
 	install := specifiedReleases.Difference(releases)
 	known := specifiedReleases.Intersect(releases)
 	upgrade, err := extractUpgrades(known, releasesMap, stackMap)
@@ -115,7 +117,7 @@ func (p *Plan) Process(namespaces []string) ([]Operation, error) {
 		for r := range s.Iter() {
 			name := r.(string)
 			stack := stackMap[name]
-			stack.action = actionInstall
+			stack.action = action
 			stackMap[name] = stack
 		}
 	}
@@ -124,9 +126,8 @@ func (p *Plan) Process(namespaces []string) ([]Operation, error) {
 
 	stacks := install.Union(upgrade).ToSlice()
 	graph := make(dependencyGraph, len(stacks))
-	for i := range stacks {
-		s := stacks[i]
-		graph[i] = s.(Stack)
+	for i, s := range stacks {
+		graph[i] = stackMap[s.(string)]
 	}
 
 	graph, err = resolveDependencies(graph)
@@ -147,14 +148,14 @@ func createOperations(graph dependencyGraph) ([]Operation, error) {
 			return Operation{
 				Description: fmt.Sprintf("Installing %s", s),
 				Run:         s.Spec.installCmd(),
-				Undo:        []string{},
+				Undo:        s.Spec.deleteCmd(),
 			}
 		},
 		actionUpgrade: func(s Stack) Operation {
 			return Operation{
 				Description: fmt.Sprintf("Upgrading %s", s),
 				Run:         s.Spec.upgradeCmd(),
-				Undo:        []string{},
+				Undo:        s.Spec.rollbackCmd(),
 			}
 		},
 	}
@@ -247,7 +248,7 @@ func (p Plan) verify() (bool, error) {
 	}
 
 	if duplicated.Cardinality() > 0 {
-		return false, fmt.Errorf("Error: Found duplicated release name %s", duplicated)
+		return false, fmt.Errorf("Found duplicated release name %s", duplicated.ToSlice())
 	}
 
 	return true, nil
@@ -299,14 +300,7 @@ func (s Stack) Name() string {
 }
 
 func (s Stack) Deps() []string {
-	deps := []string{}
-	for _, dep := range s.Depends {
-		if !strings.Contains(dep, "/") {
-			dep = s.Spec.Namespace + "/" + dep
-		}
-		deps = append(deps, dep)
-	}
-	return deps
+	return s.Depends
 }
 
 // --- Dependency resolution --------------------------------------------------
@@ -317,6 +311,13 @@ type GraphNode interface {
 }
 
 type dependencyGraph []GraphNode
+
+func (g dependencyGraph) print() {
+
+	for _, n := range g {
+		fmt.Printf("%s -> %s\n", n.Name(), n.Deps())
+	}
+}
 
 // resolveDependencies uses topological sort to resolve the node dependencies
 // http://dnaeon.github.io/dependency-graph-resolution-algorithm-in-go/
@@ -330,14 +331,13 @@ func resolveDependencies(graph dependencyGraph) (dependencyGraph, error) {
 
 	// Populate the maps
 	for _, node := range graph {
-		name := node.Name()
-		nodeNames[name] = node
+		nodeNames[node.Name()] = node
 
 		dependencySet := mapset.NewSet()
 		for _, dep := range node.Deps() {
 			dependencySet.Add(dep)
 		}
-		nodeDependencies[name] = dependencySet
+		nodeDependencies[node.Name()] = dependencySet
 	}
 
 	// Iteratively find and remove nodes from the graph which have no dependencies.
