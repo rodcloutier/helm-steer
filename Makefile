@@ -1,6 +1,6 @@
 HELM_HOME ?= $(shell helm home)
 HELM_PLUGIN_DIR ?= $(HELM_HOME)/plugins/helm-template
-HAS_GLIDE := $(shell command -v glide;)
+HAS_DEP := $(shell command -v dep;)
 VERSION := $(shell sed -n -e 's/version:[ "]*\([^"]*\).*/\1/p' plugin.yaml)
 DIST := $(CURDIR)/_dist
 LDFLAGS := "-X main.version=${VERSION}"
@@ -33,7 +33,7 @@ dist: generate
 
 .PHONY: bootstrap
 bootstrap:
-ifndef HAS_GLIDE
-	go get -u github.com/Masterminds/glide
+ifndef HAS_DEP
+	go get -u github.com/golang/dep/cmd/dep
 endif
-	glide install --strip-vendor
+	dep ensure -update
