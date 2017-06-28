@@ -44,3 +44,7 @@
 [[constraint]]
   branch = "master"
   name = "github.com/spf13/viper"
+
+[[constraint]]
+  version = "2.5.0"
+  name = "k8s.io/helm"

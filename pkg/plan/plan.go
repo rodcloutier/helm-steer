@@ -15,6 +15,12 @@ import (
 
 type Action int
 
+const (
+	actionInstall Action = iota
+	actionUpgrade
+	actionDelete
+)
+
 type Stack struct {
 	Spec    ChartSpec `json:"spec"`
 	Depends []string  `json:"depends"`
@@ -34,20 +40,14 @@ type Operation struct {
 	Command     []string
 }
 
-type AtomicOperation struct {
+type UndoableOperation struct {
 	Run  Operation
 	Undo Operation
 }
 
-const (
-	actionInstall Action = iota
-	actionUpgrade
-	actionDelete
-)
-
 // Process will process the plan to extract a dependencies sorted list
 // of operations to perform
-func (p *Plan) Process(namespaces []string) ([]AtomicOperation, error) {
+func (p *Plan) Process(namespaces []string) ([]UndoableOperation, error) {
 
 	// TODO (rod) do this per namespace ?
 	isValidNamespace := func(string) bool { return true }
@@ -111,7 +111,8 @@ func (p *Plan) Process(namespaces []string) ([]AtomicOperation, error) {
 
 	install := specifiedReleases.Difference(releases)
 	known := specifiedReleases.Intersect(releases)
-	upgrade, err := extractUpgrades(known, releasesMap, stackMap)
+	upgrade := known
+	// upgrade, err := extractUpgrades(known, releasesMap, stackMap)
 	if err != nil {
 		return nil, err
 	}
@@ -146,11 +147,11 @@ func (p *Plan) Process(namespaces []string) ([]AtomicOperation, error) {
 }
 
 // createOperations creates a list of operations based on the specified dependency graph
-func createOperations(graph dependencyGraph) ([]AtomicOperation, error) {
+func createOperations(graph dependencyGraph) ([]UndoableOperation, error) {
 
-	operations := map[Action]func(Stack) AtomicOperation{
-		actionInstall: func(s Stack) AtomicOperation {
-			return AtomicOperation{
+	operations := map[Action]func(Stack) UndoableOperation{
+		actionInstall: func(s Stack) UndoableOperation {
+			return UndoableOperation{
 				Run: Operation{
 					Description: fmt.Sprintf("Installing %s", s),
 					Command:     s.Spec.installCmd(),
@@ -161,8 +162,8 @@ func createOperations(graph dependencyGraph) ([]AtomicOperation, error) {
 				},
 			}
 		},
-		actionUpgrade: func(s Stack) AtomicOperation {
-			return AtomicOperation{
+		actionUpgrade: func(s Stack) UndoableOperation {
+			return UndoableOperation{
 				Run: Operation{
 					Description: fmt.Sprintf("Upgrading %s", s),
 					Command:     s.Spec.upgradeCmd(),
@@ -175,7 +176,7 @@ func createOperations(graph dependencyGraph) ([]AtomicOperation, error) {
 		},
 	}
 
-	ops := []AtomicOperation{}
+	ops := []UndoableOperation{}
 	for _, r := range graph {
 		s := r.(Stack)
 		ops = append(ops, operations[s.action](s))
@@ -228,7 +229,7 @@ func extractUpgrades(known mapset.Set, releasesMap map[string]*release.Release, 
 	return upgrade, nil
 }
 
-// Conform will apply the name and namespaces to the contained Stack
+// Conform will apply the name and namespaces to the contained Stacks
 func (p *Plan) conform() {
 	for namespaceName, ns := range p.Namespaces {
 		for stackName, _ := range ns {
@@ -300,7 +301,6 @@ func loadString(content []byte) (*Plan, error) {
 // --- stack ------------------------------------------------------------------
 
 func (s *Stack) conform(namespace, name string) {
-	// TODO should we validate that the names correspond to the expected value?
 	s.Spec.Conform(namespace, name)
 }
 
@@ -309,14 +309,17 @@ func (s Stack) String() string {
 	return fmt.Sprintf("%s", s.Spec)
 }
 
+// Name returns the release name for the stack
 func (s Stack) Name() string {
 	return s.Spec.name
 }
 
+// Deps returns a list of stacks on which the current stack depends
 func (s Stack) Deps() []string {
 	return s.Depends
 }
 
+// Version returns the version of the stack
 func (s Stack) Version() string {
 	return s.Spec.Version()
 }

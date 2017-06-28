@@ -2,7 +2,11 @@
 
 This is a Helm plugin to help deploy and manage multiple charts in a Kubernetes
 cluster. Operations are performed according to a plan, a file, that direct the
-charts to install, with the appropriate options.
+charts to install or upgrade, with the appropriate options. When called, steer
+will ensure that all specified commands are performed in an atomic fashion. If
+any operation fails, the appropriate undo command will be performed (install -> delete,
+upgrade -> rollback, etc.).
+
 
 ## Usage
 
@@ -17,7 +21,7 @@ $ helm steer plan.yaml
 `helm steer` use `plan` files to direct the operations. The `plan` file
 are akin to a frozen command to Helm with all the flags and arguments.
 
-Each Chart entry contains a dictionnary with the keys being exactly the
+Each Chart entry contains a dictionnary of commands with the keys being exactly the
 same as the helm command flags.
 
 Have a look a the [plan.yaml.tpl](plan.yaml.tpl) for an annoted example

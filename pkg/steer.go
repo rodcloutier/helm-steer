@@ -21,7 +21,7 @@ func Steer(outputWriter, debugWriter io.Writer, planPath string, namespaces []st
 	}
 
 	// Build the actual commands
-	operationStack := []plan.AtomicOperation{}
+	operationStack := []plan.UndoableOperation{}
 	for _, operation := range operations {
 		run := operation.Run
 		fmt.Println(run.Description)
@@ -46,7 +46,7 @@ func Steer(outputWriter, debugWriter io.Writer, planPath string, namespaces []st
 			}
 			return err
 		}
-		operationStack = append([]plan.AtomicOperation{operation}, operationStack...)
+		operationStack = append([]plan.UndoableOperation{operation}, operationStack...)
 	}
 	return nil
 }

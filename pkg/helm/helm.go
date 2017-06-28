@@ -36,7 +36,17 @@ func newClient() helm.Interface {
 func List() ([]*release.Release, error) {
 	client := newClient()
 
-	res, err := client.ListReleases()
+	var codes = []release.Status_Code{
+		release.Status_FAILED,
+		release.Status_DELETED,
+		release.Status_DEPLOYED,
+	}
+
+	ops := []helm.ReleaseListOption{
+		helm.ReleaseListStatuses(codes),
+	}
+
+	res, err := client.ListReleases(ops...)
 	if err != nil {
 		return []*release.Release{}, err
 	}
