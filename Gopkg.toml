@@ -48,3 +48,7 @@
 [[constraint]]
   version = "2.5.0"
   name = "k8s.io/helm"
+
+[[constraint]]
+  version = "master"
+  name = "github.com/fatih/color"

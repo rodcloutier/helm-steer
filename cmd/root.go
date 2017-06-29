@@ -25,6 +25,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/rodcloutier/helm-steer/pkg"
+	"github.com/rodcloutier/helm-steer/pkg/format"
 )
 
 var (
@@ -62,7 +63,7 @@ var RootCmd = &cobra.Command{
 		}
 
 		if debug {
-			debugWriter = cmd.OutOrStderr()
+			debugWriter = format.ColorizeWriter(cmd.OutOrStderr(), format.Cyan)
 		}
 		if verbose {
 			outputWriter = cmd.OutOrStderr()
@@ -80,7 +81,6 @@ var RootCmd = &cobra.Command{
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
 	if err := RootCmd.Execute(); err != nil {
-		fmt.Println(err)
 		os.Exit(1)
 	}
 }
