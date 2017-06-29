@@ -43,6 +43,8 @@ var (
 	debugWriter io.Writer = ioutil.Discard
 	// The output writer
 	outputWriter io.Writer = ioutil.Discard
+	// The version flag to output the version
+	version bool
 )
 
 // RootCmd represents the base command when called without any subcommands
@@ -52,6 +54,11 @@ var RootCmd = &cobra.Command{
 	Long:  ``,
 
 	RunE: func(cmd *cobra.Command, args []string) error {
+
+		if version {
+			fmt.Println(steer.Version)
+			return nil
+		}
 
 		if len(args) == 0 {
 			// error
@@ -92,6 +99,7 @@ func init() {
 	RootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Print the executed commands output to stderr")
 	RootCmd.Flags().BoolVarP(&dryRun, "dry-run", "", false, "only print the operations but does not perform them")
 	RootCmd.Flags().StringSliceVarP(&namespaces, "namespace", "n", []string{}, "specify the namespace(s) to target")
+	RootCmd.Flags().BoolVarP(&version, "version", "", false, "show the version and exits")
 }
 
 // initConfig reads in config file and ENV variables if set.
