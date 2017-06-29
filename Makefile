@@ -1,7 +1,7 @@
 HELM_HOME ?= $(shell helm home)
 HELM_PLUGIN_DIR ?= $(HELM_HOME)/plugins/helm-steer
 HAS_DEP := $(shell command -v dep;)
-VERSION := $(cat VERSION)
+VERSION = $(shell cat VERSION)
 DIST := $(CURDIR)/_dist
 
 ifeq ($(OS),Windows_NT)
