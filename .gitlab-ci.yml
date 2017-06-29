@@ -1,0 +1,36 @@
+stages:
+- version
+- build
+- publish
+
+version:generate:
+  stage: version
+  script:
+  - make VERSION
+  artifacts:
+    paths:
+    - /$CI_PROJECT_PATH/VERSION
+    expire_in: 4 hour
+  tags:
+  - docker
+
+
+build:go:
+  stage: build
+  image: $GO_IMAGE
+  dependencies:
+  - version:generate
+  variables:
+    GO_PACKAGE_IMPORT_PATH: github.com/rodcloutier/$CI_PROJECT_NAME
+  before_script:
+  - source switch-to-go-project
+  - http_proxy=$PROXY https_proxy=$PROXY make bootstrap
+  script:
+  - make test
+  - make dist
+  artifacts:
+    paths:
+    - /$CI_PROJECT_PATH/_dist
+    expire_in: 4 hour
+  tags:
+  - docker

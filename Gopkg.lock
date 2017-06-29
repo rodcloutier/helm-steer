@@ -125,7 +125,7 @@
   branch = "master"
   name = "github.com/spf13/cobra"
   packages = ["."]
-  revision = "4d647c8944eb42504a714e57e97f244ed6344722"
+  revision = "8c6fa02d2225de0f9bdcb7ca912556f68d172d8c"
 
 [[projects]]
   branch = "master"
@@ -149,7 +149,7 @@
   branch = "master"
   name = "golang.org/x/net"
   packages = ["context","http2","http2/hpack","idna","internal/timeseries","lex/httplex","trace"]
-  revision = "8663ed5da4fd087c3cfb99a996e628b72e2f0948"
+  revision = "1f9224279e98554b6a6432d4dd998a739f8b2b7c"
 
 [[projects]]
   branch = "master"
@@ -185,7 +185,7 @@
   branch = "master"
   name = "k8s.io/apimachinery"
   packages = ["pkg/version"]
-  revision = "728b986edb9bd4bb8a022a8cc13573a97ecc2239"
+  revision = "285e0d16a602dbad9312c543bbb2d18c904e53a2"
 
 [[projects]]
   name = "k8s.io/helm"
@@ -196,6 +196,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "801ead1d091ec39deabf89381b649785f372609a8f349376d1ab53c024ef1e29"
+  inputs-digest = "bc8508dcf5d16804f15f38af66ae75c373f279ccf4deac5790b83e4271b89ff0"
   solver-name = "gps-cdcl"
   solver-version = 1
