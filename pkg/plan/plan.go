@@ -25,7 +25,8 @@ type Stack struct {
 	Spec    ChartSpec `json:"spec"`
 	Depends []string  `json:"depends"`
 
-	action Action
+	action  Action
+	release *release.Release
 }
 
 type Namespace map[string]Stack
@@ -111,6 +112,9 @@ func (p *Plan) Process(namespaces []string) ([]UndoableOperation, error) {
 
 	install := specifiedReleases.Difference(releases)
 	known := specifiedReleases.Intersect(releases)
+
+	stackMap = bindReleases(known, stackMap, releasesMap)
+
 	upgrade := known
 	// upgrade, err := extractUpgrades(known, releasesMap, stackMap)
 	if err != nil {
@@ -146,6 +150,19 @@ func (p *Plan) Process(namespaces []string) ([]UndoableOperation, error) {
 	return createOperations(graph)
 }
 
+func bindReleases(stacks mapset.Set, stackMap map[string]Stack, releaseMap map[string]*release.Release) map[string]Stack {
+
+	boundStackMap := stackMap
+
+	for n := range stacks.Iter() {
+		name := n.(string)
+		stack := stackMap[name]
+		stack.SetRelease(releaseMap[name])
+		boundStackMap[name] = stack
+	}
+	return boundStackMap
+}
+
 // createOperations creates a list of operations based on the specified dependency graph
 func createOperations(graph dependencyGraph) ([]UndoableOperation, error) {
 
@@ -170,7 +187,13 @@ func createOperations(graph dependencyGraph) ([]UndoableOperation, error) {
 				},
 				Undo: Operation{
 					Description: fmt.Sprintf("Rollback on %s", s),
-					Command:     s.Spec.rollbackCmd(),
+					// TODO catch the case were the Version is 1 or release is nil
+					Command: func() []string {
+						if s.release == nil || s.release.Version <= 1 {
+							return s.Spec.deleteCmd()
+						}
+						return s.Spec.rollbackCmd(s.release.Version - 1)
+					}(),
 				},
 			}
 		},
@@ -322,6 +345,10 @@ func (s Stack) Deps() []string {
 // Version returns the version of the stack
 func (s Stack) Version() string {
 	return s.Spec.Version()
+}
+
+func (s *Stack) SetRelease(r *release.Release) {
+	s.release = r
 }
 
 // --- Dependency resolution --------------------------------------------------

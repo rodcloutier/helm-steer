@@ -3,6 +3,7 @@ package plan
 import (
 	"fmt"
 	"reflect"
+	"strconv"
 )
 
 type InstallArgs struct {
@@ -179,12 +180,10 @@ func (c *ChartSpec) upgradeCmd() []string {
 	return append(args, c.name, c.Chart)
 }
 
-func (c *ChartSpec) rollbackCmd() []string {
+func (c *ChartSpec) rollbackCmd(revision int32) []string {
 	args := []string{"rollback"}
 	args = append(args, buildHelmCmdArgs(c.Rollback)...)
-	// TODO (rod) fetch the revision that is expected (the last one)
-	revision := "1"
-	return append(args, c.name, revision)
+	return append(args, c.name, strconv.Itoa(int(revision)))
 }
 
 func (c *ChartSpec) deleteCmd() []string {
