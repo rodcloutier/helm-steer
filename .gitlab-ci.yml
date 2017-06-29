@@ -25,6 +25,7 @@ build:go:
   before_script:
   - source switch-to-go-project
   - http_proxy=$PROXY https_proxy=$PROXY make bootstrap
+  - chmod a+x scripts/generate-version.sh
   script:
   - make test
   - make dist
