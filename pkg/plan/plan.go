@@ -29,7 +29,9 @@ type Release struct {
 	release *release.Release
 }
 
-type Namespace map[string]Release
+type Namespace struct {
+	Releases map[string]Release
+}
 
 type Plan struct {
 	Namespaces map[string]Namespace `json:"namespaces"`
@@ -64,7 +66,7 @@ func (p *Plan) Process(namespaces []string) ([]UndoableOperation, error) {
 	}
 
 	// List the currently installed chart deployments
-	currentReleases, err := helm.List()
+	rawCurrentReleases, err := helm.List()
 	if err != nil {
 		fmt.Println("Error: Failed to fetch helm list: %s", err)
 		return nil, err
@@ -76,10 +78,10 @@ func (p *Plan) Process(namespaces []string) ([]UndoableOperation, error) {
 		if !isValidNamespace(namespaceName) {
 			continue
 		}
-		for releaseName, _ := range ns {
+		for releaseName, _ := range ns.Releases {
 			key := namespaceName + "." + releaseName
 			specifiedReleases.Add(key)
-			specifiedReleasesMap[key] = ns[releaseName]
+			specifiedReleasesMap[key] = ns.Releases[releaseName]
 		}
 	}
 
@@ -88,9 +90,9 @@ func (p *Plan) Process(namespaces []string) ([]UndoableOperation, error) {
 		return nil, nil
 	}
 
-	installedReleases := mapset.NewSet()
-	installedReleasesMap := make(map[string]*release.Release)
-	for _, r := range currentReleases {
+	currentReleases := mapset.NewSet()
+	currentReleasesMap := make(map[string]*release.Release)
+	for _, r := range rawCurrentReleases {
 		if !isValidNamespace(r.Namespace) {
 			continue
 		}
@@ -99,21 +101,21 @@ func (p *Plan) Process(namespaces []string) ([]UndoableOperation, error) {
 			continue
 		}
 		key := r.Namespace + "." + r.Name
-		installedReleases.Add(key)
-		installedReleasesMap[key] = r
+		currentReleases.Add(key)
+		currentReleasesMap[key] = r
 	}
 
 	// TODO (rod): delete is a special case where we do not have a Release defined
 	// we need to see how to handle this
-	// delete := installedReleases.Difference(specifiedReleases)
+	// delete := currentReleases.Difference(specifiedReleases)
 
 	/// TODO (rod): Validate that the chart names match the same release name
 	// in the same namespace
 
-	install := specifiedReleases.Difference(installedReleases)
-	known := specifiedReleases.Intersect(installedReleases)
+	install := specifiedReleases.Difference(currentReleases)
+	known := specifiedReleases.Intersect(currentReleases)
 
-	specifiedReleasesMap = bindReleases(known, specifiedReleasesMap, installedReleasesMap)
+	specifiedReleasesMap = bindReleases(known, specifiedReleasesMap, currentReleasesMap)
 
 	upgrade := known
 	// upgrade, err := extractUpgrades(known, releasesMap, specifiedReleasesMap)
@@ -150,14 +152,14 @@ func (p *Plan) Process(namespaces []string) ([]UndoableOperation, error) {
 	return createOperations(graph)
 }
 
-func bindReleases(releases mapset.Set, specifiedReleasesMap map[string]Release, installedReleasesMap map[string]*release.Release) map[string]Release {
+func bindReleases(releases mapset.Set, specifiedReleasesMap map[string]Release, currentReleasesMap map[string]*release.Release) map[string]Release {
 
 	boundReleaseMap := specifiedReleasesMap
 
 	for n := range releases.Iter() {
 		name := n.(string)
 		release := specifiedReleasesMap[name]
-		release.SetRelease(installedReleasesMap[name])
+		release.SetRelease(currentReleasesMap[name])
 		boundReleaseMap[name] = release
 	}
 	return boundReleaseMap
@@ -255,10 +257,9 @@ func extractUpgrades(known mapset.Set, releasesMap map[string]*release.Release, 
 // Conform will apply the name and namespaces to the contained Releases
 func (p *Plan) conform() {
 	for namespaceName, ns := range p.Namespaces {
-		for releaseName, _ := range ns {
-			release := ns[releaseName]
+		for releaseName, release := range ns.Releases {
 			release.conform(namespaceName, releaseName)
-			ns[releaseName] = release
+			ns.Releases[releaseName] = release
 		}
 	}
 }
@@ -274,7 +275,7 @@ func (p Plan) verify() (bool, error) {
 	i := 0
 	for _, ns := range p.Namespaces {
 		s := mapset.NewSet()
-		for name := range ns {
+		for name := range ns.Releases {
 			s.Add(name)
 		}
 		names[i] = s

@@ -1,0 +1,35 @@
+version: beta1
+
+# Example that operation are atomic, with a rollback
+# Run single_chart
+# This will:
+#  - install example-error-success but will
+#  - fail installing example-error-failure
+#  - perform a delete on the example-error-success
+
+namespaces:
+  steer-single:
+    releases:
+      # Releases already installed that will be rollbacked to the previous
+      # version
+      # perform a helm list before and after to see that the release
+      # revision increased by 2 (the upgrade and the rollback)
+      example-single:
+        spec:
+          chart: stable/redis
+          install: &example-single-flags
+            version: 0.7.0
+            wait: true
+          upgrade:
+            <<: *example-single-flags
+
+  steer-error:
+    releases:
+      # Release that will fail
+      example-error-failure:
+        depends: [example-single]
+        spec:
+          chart: stable/foobar
+          install:
+            version: 0.7.0
+

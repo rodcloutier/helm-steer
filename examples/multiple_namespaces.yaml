@@ -1,0 +1,26 @@
+version: beta1
+
+# The namespaces to manage
+namespaces:
+  # Namespace steer-multi
+  steer-multi:
+    releases:
+      # Releases to install
+      example-release:
+        depends: []
+        spec:
+          chart: stable/redis
+          install:
+            version: 0.7.0
+
+  # Namespace steer-multi-clone
+  steer-multi-clone:
+    releases:
+      # Releases to install
+      example-release-clone:
+        depends: []
+        spec:
+          chart: stable/redis
+          install:
+            version: 0.7.0
+

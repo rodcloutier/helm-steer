@@ -1,0 +1,16 @@
+version: beta1
+
+# The namespaces to manager
+namespaces:
+  # Namespace
+  steer-single:
+    releases:
+      # Releases to install
+      example-single:
+        spec:
+          chart: stable/redis
+          install: &example-single-flags
+            version: 0.7.0
+            wait: true
+          upgrade:
+            <<: *example-single-flags

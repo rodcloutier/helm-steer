@@ -1,0 +1,31 @@
+version: beta1
+
+# Example that operation are atomic
+# This will:
+#  - install example-error-success but will
+#  - fail installing example-error-failure
+#  - perform a delete on the example-error-success
+
+namespaces:
+
+  # Namespace steer-multi
+  steer-error:
+    releases:
+      # Releases that will succeed
+      example-error-success:
+        spec:
+          chart: stable/redis
+          install:
+            version: 0.7.0
+          delete:
+            purge: true
+
+      # Release that must fail
+      example-error-failure:
+        depends: [example-error-success]
+        spec:
+          chart: stable/foobar
+          install:
+            version: 0.7.0
+
+

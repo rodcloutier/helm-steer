@@ -1,0 +1,32 @@
+version: beta1
+
+# The namespaces to manager
+namespaces:
+  steer-dependencies:
+    releases:
+      # Explicit dependency on the example-parent release
+      example-dependencies-child:
+        depends: [example-dependencies-parent]
+        spec:
+          chart: stable/redis
+          install:
+            version: 0.7.0
+
+      # depends field can be omitted if not needed
+      example-dependencies-parent:
+        spec:
+          chart: stable/redis
+          install:
+            version: 0.7.0
+
+  steer-dependencies-clone:
+    releases:
+      # Since release name must be unique, we can also depend across namespaces
+      example-dependencies-clone:
+        depends: [example-dependencies-parent]
+        spec:
+          chart: stable/redis
+          install:
+            version: 0.7.0
+
+
