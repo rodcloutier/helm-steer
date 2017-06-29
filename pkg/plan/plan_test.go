@@ -10,8 +10,10 @@ func TestPlanValidity(t *testing.T) {
 	p := Plan{
 		Version: "beta1",
 		Namespaces: map[string]Namespace{
-			"foo": map[string]Stack{
-				"service": Stack{},
+			"foo": Namespace{
+				Releases: map[string]Release{
+					"service": Release{},
+				},
 			},
 		},
 	}
@@ -25,11 +27,15 @@ func TestPlanValidity(t *testing.T) {
 	p = Plan{
 		Version: "beta1",
 		Namespaces: map[string]Namespace{
-			"foo": map[string]Stack{
-				"service": Stack{},
+			"foo": Namespace{
+				Releases: map[string]Release{
+					"service": Release{},
+				},
 			},
-			"bar": map[string]Stack{
-				"service": Stack{},
+			"bar": Namespace{
+				Releases: map[string]Release{
+					"service": Release{},
+				},
 			},
 		},
 	}
