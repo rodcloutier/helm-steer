@@ -21,7 +21,7 @@ const (
 	actionDelete
 )
 
-type Stack struct {
+type Release struct {
 	Spec    ChartSpec `json:"spec"`
 	Depends []string  `json:"depends"`
 
@@ -29,7 +29,7 @@ type Stack struct {
 	release *release.Release
 }
 
-type Namespace map[string]Stack
+type Namespace map[string]Release
 
 type Plan struct {
 	Namespaces map[string]Namespace `json:"namespaces"`
@@ -71,25 +71,25 @@ func (p *Plan) Process(namespaces []string) ([]UndoableOperation, error) {
 	}
 
 	specifiedReleases := mapset.NewSet()
-	stackMap := make(map[string]Stack)
+	specifiedReleasesMap := make(map[string]Release)
 	for namespaceName, ns := range p.Namespaces {
 		if !isValidNamespace(namespaceName) {
 			continue
 		}
-		for stackName, _ := range ns {
-			key := namespaceName + "." + stackName
+		for releaseName, _ := range ns {
+			key := namespaceName + "." + releaseName
 			specifiedReleases.Add(key)
-			stackMap[key] = ns[stackName]
+			specifiedReleasesMap[key] = ns[releaseName]
 		}
 	}
 
 	if specifiedReleases.Cardinality() == 0 {
-		fmt.Println("Nothing to do, no stack found")
+		fmt.Println("Nothing to do, no release found")
 		return nil, nil
 	}
 
-	releases := mapset.NewSet()
-	releasesMap := make(map[string]*release.Release)
+	installedReleases := mapset.NewSet()
+	installedReleasesMap := make(map[string]*release.Release)
 	for _, r := range currentReleases {
 		if !isValidNamespace(r.Namespace) {
 			continue
@@ -99,24 +99,24 @@ func (p *Plan) Process(namespaces []string) ([]UndoableOperation, error) {
 			continue
 		}
 		key := r.Namespace + "." + r.Name
-		releases.Add(key)
-		releasesMap[key] = r
+		installedReleases.Add(key)
+		installedReleasesMap[key] = r
 	}
 
-	// TODO (rod): delete is a special case where we do not have a Stack defined
+	// TODO (rod): delete is a special case where we do not have a Release defined
 	// we need to see how to handle this
-	// delete := releases.Difference(specifiedReleases)
+	// delete := installedReleases.Difference(specifiedReleases)
 
 	/// TODO (rod): Validate that the chart names match the same release name
 	// in the same namespace
 
-	install := specifiedReleases.Difference(releases)
-	known := specifiedReleases.Intersect(releases)
+	install := specifiedReleases.Difference(installedReleases)
+	known := specifiedReleases.Intersect(installedReleases)
 
-	stackMap = bindReleases(known, stackMap, releasesMap)
+	specifiedReleasesMap = bindReleases(known, specifiedReleasesMap, installedReleasesMap)
 
 	upgrade := known
-	// upgrade, err := extractUpgrades(known, releasesMap, stackMap)
+	// upgrade, err := extractUpgrades(known, releasesMap, specifiedReleasesMap)
 	if err != nil {
 		return nil, err
 	}
@@ -126,18 +126,18 @@ func (p *Plan) Process(namespaces []string) ([]UndoableOperation, error) {
 	setAction := func(s mapset.Set, action Action) {
 		for r := range s.Iter() {
 			name := r.(string)
-			stack := stackMap[name]
-			stack.action = action
-			stackMap[name] = stack
+			release := specifiedReleasesMap[name]
+			release.action = action
+			specifiedReleasesMap[name] = release
 		}
 	}
 	setAction(install, actionInstall)
 	setAction(upgrade, actionUpgrade)
 
-	stacks := install.Union(upgrade).ToSlice()
-	graph := make(dependencyGraph, len(stacks))
-	for i, s := range stacks {
-		graph[i] = stackMap[s.(string)]
+	releases := install.Union(upgrade).ToSlice()
+	graph := make(dependencyGraph, len(releases))
+	for i, s := range releases {
+		graph[i] = specifiedReleasesMap[s.(string)]
 	}
 
 	graph, err = resolveDependencies(graph)
@@ -150,24 +150,24 @@ func (p *Plan) Process(namespaces []string) ([]UndoableOperation, error) {
 	return createOperations(graph)
 }
 
-func bindReleases(stacks mapset.Set, stackMap map[string]Stack, releaseMap map[string]*release.Release) map[string]Stack {
+func bindReleases(releases mapset.Set, specifiedReleasesMap map[string]Release, installedReleasesMap map[string]*release.Release) map[string]Release {
 
-	boundStackMap := stackMap
+	boundReleaseMap := specifiedReleasesMap
 
-	for n := range stacks.Iter() {
+	for n := range releases.Iter() {
 		name := n.(string)
-		stack := stackMap[name]
-		stack.SetRelease(releaseMap[name])
-		boundStackMap[name] = stack
+		release := specifiedReleasesMap[name]
+		release.SetRelease(installedReleasesMap[name])
+		boundReleaseMap[name] = release
 	}
-	return boundStackMap
+	return boundReleaseMap
 }
 
 // createOperations creates a list of operations based on the specified dependency graph
 func createOperations(graph dependencyGraph) ([]UndoableOperation, error) {
 
-	operations := map[Action]func(Stack) UndoableOperation{
-		actionInstall: func(s Stack) UndoableOperation {
+	operations := map[Action]func(Release) UndoableOperation{
+		actionInstall: func(s Release) UndoableOperation {
 			return UndoableOperation{
 				Run: Operation{
 					Description: fmt.Sprintf("Installing %s", s),
@@ -179,7 +179,7 @@ func createOperations(graph dependencyGraph) ([]UndoableOperation, error) {
 				},
 			}
 		},
-		actionUpgrade: func(s Stack) UndoableOperation {
+		actionUpgrade: func(s Release) UndoableOperation {
 			return UndoableOperation{
 				Run: Operation{
 					Description: fmt.Sprintf("Upgrading %s", s),
@@ -201,21 +201,21 @@ func createOperations(graph dependencyGraph) ([]UndoableOperation, error) {
 
 	ops := []UndoableOperation{}
 	for _, r := range graph {
-		s := r.(Stack)
+		s := r.(Release)
 		ops = append(ops, operations[s.action](s))
 	}
 
 	return ops, nil
 }
 
-func extractUpgrades(known mapset.Set, releasesMap map[string]*release.Release, stackMap map[string]Stack) (mapset.Set, error) {
+func extractUpgrades(known mapset.Set, releasesMap map[string]*release.Release, specifiedReleasesMap map[string]Release) (mapset.Set, error) {
 
 	upgrade := mapset.NewSet()
 
 	for r := range known.Iter() {
 
 		release := r.(string)
-		specifiedVersion := stackMap[release].Version()
+		specifiedVersion := specifiedReleasesMap[release].Version()
 
 		// No version is specified, we must asssume that we will potentially
 		// upgrade.
@@ -252,13 +252,13 @@ func extractUpgrades(known mapset.Set, releasesMap map[string]*release.Release, 
 	return upgrade, nil
 }
 
-// Conform will apply the name and namespaces to the contained Stacks
+// Conform will apply the name and namespaces to the contained Releases
 func (p *Plan) conform() {
 	for namespaceName, ns := range p.Namespaces {
-		for stackName, _ := range ns {
-			stack := ns[stackName]
-			stack.conform(namespaceName, stackName)
-			ns[stackName] = stack
+		for releaseName, _ := range ns {
+			release := ns[releaseName]
+			release.conform(namespaceName, releaseName)
+			ns[releaseName] = release
 		}
 	}
 }
@@ -321,34 +321,34 @@ func loadString(content []byte) (*Plan, error) {
 	return &plan, nil
 }
 
-// --- stack ------------------------------------------------------------------
+// --- Release ------------------------------------------------------------------
 
-func (s *Stack) conform(namespace, name string) {
-	s.Spec.Conform(namespace, name)
+func (r *Release) conform(namespace, name string) {
+	r.Spec.Conform(namespace, name)
 }
 
-// String returns the string representation of a stack
-func (s Stack) String() string {
-	return fmt.Sprintf("%s", s.Spec)
+// String returns the string representation of a release
+func (r Release) String() string {
+	return fmt.Sprintf("%s", r.Spec)
 }
 
-// Name returns the release name for the stack
-func (s Stack) Name() string {
-	return s.Spec.name
+// Name returns the release name for the release
+func (r Release) Name() string {
+	return r.Spec.name
 }
 
-// Deps returns a list of stacks on which the current stack depends
-func (s Stack) Deps() []string {
-	return s.Depends
+// Deps returns a list of releases on which the current release depends
+func (r Release) Deps() []string {
+	return r.Depends
 }
 
-// Version returns the version of the stack
-func (s Stack) Version() string {
-	return s.Spec.Version()
+// Version returns the version of the release
+func (r Release) Version() string {
+	return r.Spec.Version()
 }
 
-func (s *Stack) SetRelease(r *release.Release) {
-	s.release = r
+func (r *Release) SetRelease(helmRelease *release.Release) {
+	r.release = helmRelease
 }
 
 // --- Dependency resolution --------------------------------------------------
