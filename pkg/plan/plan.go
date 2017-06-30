@@ -22,8 +22,8 @@ const (
 )
 
 type Release struct {
-	Spec    ChartSpec `json:"spec"`
-	Depends []string  `json:"depends"`
+	Spec    ReleaseSpec `json:"spec"`
+	Depends []string    `json:"depends"`
 
 	action  Action
 	release *release.Release

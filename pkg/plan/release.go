@@ -6,7 +6,7 @@ import (
 	"strconv"
 )
 
-type InstallArgs struct {
+type InstallFlags struct {
 	CAFile       string   `json:"ca-file"`
 	Cert_file    string   `json:"cert-file"`
 	Devel        string   `json:"devel"`
@@ -32,7 +32,7 @@ type InstallArgs struct {
 	Wait         bool     `json:"wait"`
 }
 
-type UpgradeArgs struct {
+type UpgradeFlags struct {
 	CAFile        string   `json:"ca-file"`
 	Cert_file     string   `json:"cert-file"`
 	Devel         string   `json:"devel"`
@@ -60,7 +60,7 @@ type UpgradeArgs struct {
 	Wait          bool     `json:"wait"`
 }
 
-type DeleteArgs struct {
+type DeleteFlags struct {
 	Dry_run     bool   `json:"dry-run"`
 	No_hooks    bool   `json:"no-hooks"`
 	Purge       bool   `json:"purge"`
@@ -72,7 +72,7 @@ type DeleteArgs struct {
 	TLS_verify  bool   `json:"tls-verify"`
 }
 
-type RollbackArgs struct {
+type RollbackFlags struct {
 	Dry_run       bool   `json:"dry-run"`
 	Force         bool   `json:"force"`
 	No_hooks      bool   `json:"no-hooks"`
@@ -86,19 +86,23 @@ type RollbackArgs struct {
 	Wait          bool   `json:"wait"`
 }
 
-type ChartSpec struct {
+type ReleaseOperationsFlags struct {
+	Install  InstallFlags  `json:"install"`
+	Upgrade  UpgradeFlags  `json:"upgrade"`
+	Delete   DeleteFlags   `json:"delete"`
+	Rollback RollbackFlags `json:"rollback"`
+}
+
+type ReleaseSpec struct {
 	name      string
 	namespace string
 
 	// Exported to json values
-	Chart    string       `json:"chart"`
-	Install  InstallArgs  `json:"install"`
-	Upgrade  UpgradeArgs  `json:"upgrade"`
-	Delete   DeleteArgs   `json:"delete"`
-	Rollback RollbackArgs `json:"rollback"`
+	Chart string                 `json:"chart"`
+	Flags ReleaseOperationsFlags `json:"flags"`
 }
 
-func buildHelmCmdArgs(i interface{}) []string {
+func buildHelmCmdFlags(i interface{}) []string {
 	var cmd []string
 
 	val := reflect.Indirect(reflect.ValueOf(i))
@@ -140,54 +144,54 @@ func buildHelmCmdArgs(i interface{}) []string {
 	return cmd
 }
 
-func (c *ChartSpec) Conform(namespace, name string) error {
+func (r *ReleaseSpec) Conform(namespace, name string) error {
 
-	c.name = name
-	c.namespace = namespace
+	r.name = name
+	r.namespace = namespace
 
-	c.Install.Name = name
-	c.Install.Namespace = namespace
+	r.Flags.Install.Name = name
+	r.Flags.Install.Namespace = namespace
 
-	c.Upgrade.Namespace = namespace
+	r.Flags.Upgrade.Namespace = namespace
 
 	return nil
 }
 
-func (c ChartSpec) Version() string {
-	return c.Install.Version
+func (r ReleaseSpec) Version() string {
+	return r.Flags.Install.Version
 }
 
-// String returns the string representation of a ChartSpec
-func (c ChartSpec) String() string {
+// String returns the string representation of a ReleaseSpec
+func (r ReleaseSpec) String() string {
 
-	chart := c.Chart
-	if c.Install.Version != "" {
-		chart = fmt.Sprintf("%s-%s", chart, c.Install.Version)
+	chart := r.Chart
+	if r.Flags.Install.Version != "" {
+		chart = fmt.Sprintf("%s-%s", chart, r.Flags.Install.Version)
 	}
 
-	return fmt.Sprintf("%s chart: %s namespace: %s", c.name, chart, c.namespace)
+	return fmt.Sprintf("%s chart: %s namespace: %s", r.name, chart, r.namespace)
 }
 
-func (c *ChartSpec) installCmd() []string {
+func (r *ReleaseSpec) installCmd() []string {
 	args := []string{"install"}
-	args = append(args, buildHelmCmdArgs(c.Install)...)
-	return append(args, c.Chart)
+	args = append(args, buildHelmCmdFlags(r.Flags.Install)...)
+	return append(args, r.Chart)
 }
 
-func (c *ChartSpec) upgradeCmd() []string {
+func (r *ReleaseSpec) upgradeCmd() []string {
 	args := []string{"upgrade"}
-	args = append(args, buildHelmCmdArgs(c.Upgrade)...)
-	return append(args, c.name, c.Chart)
+	args = append(args, buildHelmCmdFlags(r.Flags.Upgrade)...)
+	return append(args, r.name, r.Chart)
 }
 
-func (c *ChartSpec) rollbackCmd(revision int32) []string {
+func (r *ReleaseSpec) rollbackCmd(revision int32) []string {
 	args := []string{"rollback"}
-	args = append(args, buildHelmCmdArgs(c.Rollback)...)
-	return append(args, c.name, strconv.Itoa(int(revision)))
+	args = append(args, buildHelmCmdFlags(r.Flags.Rollback)...)
+	return append(args, r.name, strconv.Itoa(int(revision)))
 }
 
-func (c *ChartSpec) deleteCmd() []string {
+func (r *ReleaseSpec) deleteCmd() []string {
 	args := []string{"delete"}
-	args = append(args, buildHelmCmdArgs(c.Delete)...)
-	return append(args, c.name)
+	args = append(args, buildHelmCmdFlags(r.Flags.Delete)...)
+	return append(args, r.name)
 }

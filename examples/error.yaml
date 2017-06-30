@@ -15,17 +15,19 @@ namespaces:
       example-error-success:
         spec:
           chart: stable/redis
-          install:
-            version: 0.7.0
-          delete:
-            purge: true
+          flags:
+            install:
+              version: 0.7.0
+            delete:
+              purge: true
 
       # Release that must fail
       example-error-failure:
         depends: [example-error-success]
         spec:
           chart: stable/foobar
-          install:
-            version: 0.7.0
+          flags:
+            install:
+              version: 0.7.0
 
 

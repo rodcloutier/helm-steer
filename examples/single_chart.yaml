@@ -9,8 +9,9 @@ namespaces:
       example-single:
         spec:
           chart: stable/redis
-          install: &example-single-flags
-            version: 0.6.0
-            wait: true
-          upgrade:
-            <<: *example-single-flags
+          flags:
+            install: &example-single-flags
+              version: 0.6.0
+              wait: true
+            upgrade:
+              <<: *example-single-flags

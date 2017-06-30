@@ -9,15 +9,17 @@ namespaces:
         depends: [example-dependencies-parent]
         spec:
           chart: stable/redis
-          install:
-            version: 0.7.0
+          flags:
+            install:
+              version: 0.7.0
 
       # depends field can be omitted if not needed
       example-dependencies-parent:
         spec:
           chart: stable/redis
-          install:
-            version: 0.7.0
+          flags:
+            install:
+              version: 0.7.0
 
   steer-dependencies-clone:
     releases:
@@ -26,7 +28,8 @@ namespaces:
         depends: [example-dependencies-parent]
         spec:
           chart: stable/redis
-          install:
-            version: 0.7.0
+          flags:
+            install:
+              version: 0.7.0
 
 

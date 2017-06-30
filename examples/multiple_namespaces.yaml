@@ -10,8 +10,9 @@ namespaces:
         depends: []
         spec:
           chart: stable/redis
-          install:
-            version: 0.7.0
+          flags:
+            install:
+              version: 0.7.0
 
   # Namespace steer-multi-clone
   steer-multi-clone:
@@ -21,6 +22,7 @@ namespaces:
         depends: []
         spec:
           chart: stable/redis
-          install:
-            version: 0.7.0
+          flags:
+            install:
+              version: 0.7.0
 

@@ -49,7 +49,7 @@ var (
 
 // RootCmd represents the base command when called without any subcommands
 var RootCmd = &cobra.Command{
-	Use:   "helm steer",
+	Use:   "helm steer [PLAN]",
 	Short: "Install multiple charts according to a plan",
 	Long:  ``,
 

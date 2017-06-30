@@ -35,8 +35,8 @@ func Steer(outputWriter, debugWriter io.Writer, planPath string, namespaces []st
 		if err == nil {
 			fmt.Println(format.Highlight("Success"))
 		} else {
-			fmt.Println(format.Error("Error: Last command failed"))
-			fmt.Println("Undoing previous commands")
+			fmt.Println(format.Error("Error: Last operation failed"))
+			fmt.Println("Undoing previous operations")
 			// Undo the commands
 			for _, operation := range operationStack {
 				undo := operation.Undo

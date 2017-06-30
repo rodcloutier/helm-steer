@@ -17,11 +17,12 @@ namespaces:
       example-single:
         spec:
           chart: stable/redis
-          install: &example-single-flags
-            version: 0.7.0
-            wait: true
-          upgrade:
-            <<: *example-single-flags
+          flags:
+            install: &example-single-flags
+              version: 0.7.0
+              wait: true
+            upgrade:
+              <<: *example-single-flags
 
   steer-error:
     releases:
@@ -30,6 +31,7 @@ namespaces:
         depends: [example-single]
         spec:
           chart: stable/foobar
-          install:
-            version: 0.7.0
+          flags:
+            install:
+              version: 0.7.0
 
